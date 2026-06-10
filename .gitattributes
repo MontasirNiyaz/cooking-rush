@@ -1,0 +1,8 @@
+# Normalize line endings: keep LF in the repo for all text/source files.
+* text=auto eol=lf
+
+# Roblox binary model/place files
+*.rbxl   binary
+*.rbxlx  binary
+*.rbxm   binary
+*.rbxmx  binary
