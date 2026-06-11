@@ -20,7 +20,11 @@ local Remotes     = require(ReplicatedStorage.Shared.Remotes)
 local Upgrades    = require(ReplicatedStorage.Shared.Config.Upgrades)
 local Stations    = require(ReplicatedStorage.Shared.Config.Stations)
 local Restaurants = require(ReplicatedStorage.Shared.Config.Restaurants)
+local Recipes     = require(ReplicatedStorage.Shared.Config.Recipes)
+local Mastery     = require(ReplicatedStorage.Shared.Config.Mastery)
+local Prestige    = require(ReplicatedStorage.Shared.Config.Prestige)
 local UpgradeMath = require(ReplicatedStorage.Shared.Modules.UpgradeMath)
+local EconomyMath = require(ReplicatedStorage.Shared.Modules.EconomyMath)
 
 local ShopController = {}
 
@@ -76,6 +80,29 @@ local function newButton(parent: Instance, text: string, enabled: boolean): Text
 	return btn
 end
 
+-- A thin progress bar (0..1) anchored to the right of a card.
+local function newBar(parent: Instance, fraction: number)
+	local bg = Instance.new("Frame")
+	bg.AnchorPoint      = Vector2.new(1, 0.5)
+	bg.Position         = UDim2.new(1, -8, 0.5, 0)
+	bg.Size             = UDim2.new(0, 150, 0, 14)
+	bg.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
+	bg.BorderSizePixel  = 0
+	bg.Parent           = parent
+	local bgc = Instance.new("UICorner")
+	bgc.CornerRadius = UDim.new(0, 7)
+	bgc.Parent = bg
+
+	local fill = Instance.new("Frame")
+	fill.Size             = UDim2.new(math.clamp(fraction, 0, 1), 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(255, 196, 60)
+	fill.BorderSizePixel  = 0
+	fill.Parent           = bg
+	local fc = Instance.new("UICorner")
+	fc.CornerRadius = UDim.new(0, 7)
+	fc.Parent = fill
+end
+
 local function newHeader(text: string, order: number): TextLabel
 	local h = Instance.new("TextLabel")
 	h.Size                   = UDim2.new(1, -12, 0, 30)
@@ -105,7 +132,8 @@ local function rebuild()
 		_status.Text = "Loading profile…"
 		return
 	end
-	_status.Text = string.format("Coins  %d      Gems  %d", profile.coins or 0, profile.gems or 0)
+	_status.Text = string.format("Coins  %d      Gems  %d      Prestige Tokens  %d",
+		profile.coins or 0, profile.gems or 0, profile.prestigeTokens or 0)
 
 	local order = 0
 	local function nextOrder(): number
@@ -147,16 +175,79 @@ local function rebuild()
 		card.Parent = _list
 	end
 
+	-- ── Recipe Mastery (M7.1) ──
+	-- One row per recipe on an unlocked restaurant's menu (deduped). Shows mastery
+	-- level + progress toward the next level.
+	newHeader("Recipe Mastery", nextOrder()).Parent = _list
+	local seen: { [string]: boolean } = {}
+	for restaurantId, config in pairs(Restaurants) do
+		if profile.unlockedRestaurants[restaurantId] then
+			for _, recipeId in ipairs(config.menu) do
+				if not seen[recipeId] then
+					seen[recipeId] = true
+					local recipe = Recipes[recipeId]
+					local entry  = (profile.mastery and profile.mastery[recipeId]) or { level = 1, xp = 0 }
+					local curve  = Mastery.resolve(recipeId)
+					local level  = EconomyMath.masteryLevel(entry.xp, curve.thresholds)
+					local maxLvl = #curve.thresholds
+
+					-- Fraction toward the next level (1 when maxed).
+					local frac = 1
+					if level < maxLvl then
+						local base = curve.thresholds[level]
+						local nxt  = curve.thresholds[level + 1]
+						frac = (entry.xp - base) / math.max(nxt - base, 1)
+					end
+
+					local card = newCard(nextOrder())
+					newLabel(card, string.format("%s   (Mastery %d/%d)",
+						(recipe and recipe.displayName) or recipeId, level, maxLvl),
+						8, 240, Enum.TextXAlignment.Left)
+					newBar(card, frac)
+				end
+			end
+		end
+	end
+
 	-- ── Restaurants ──
-	newHeader("Restaurants", nextOrder()).Parent = _list
+	newHeader("Restaurants & Franchise", nextOrder()).Parent = _list
 	for restaurantId, config in pairs(Restaurants) do
 		local card = newCard(nextOrder())
 		newLabel(card, config.displayName, 8, 200, Enum.TextXAlignment.Left)
 
 		local unlocked = profile.unlockedRestaurants[restaurantId] == true
+		local prestigeLevel = (profile.prestige and profile.prestige[restaurantId]) or 0
 		if unlocked then
-			local lbl = newLabel(card, "Unlocked", 214, 220, Enum.TextXAlignment.Left)
+			-- Eligible to franchise only when every level is 3-starred.
+			local allThree = true
+			for i = 1, config.levelCount do
+				if (profile.levelStars[restaurantId .. ":" .. i] or 0) < 3 then
+					allThree = false
+					break
+				end
+			end
+			local maxed = prestigeLevel >= Prestige.maxLevel
+			local statusText = string.format("Unlocked · Prestige %d (x%.2f earnings)",
+				prestigeLevel, EconomyMath.prestigeMultiplier(prestigeLevel, Prestige))
+			local lbl = newLabel(card, statusText, 214, 200, Enum.TextXAlignment.Left)
 			lbl.TextColor3 = Color3.fromRGB(150, 230, 150)
+
+			if not maxed then
+				local btn = newButton(card, "Franchise", allThree)
+				btn.Activated:Connect(function()
+					local ok, result = pcall(function()
+						return Remotes.FranchiseRestaurant:InvokeServer(restaurantId)
+					end)
+					if ok and type(result) == "table" and result.ok then
+						_status.Text = string.format("Franchised %s → Prestige %d (+%d tokens)!",
+							config.displayName, result.prestigeLevel, result.tokens)
+						ProfileController:refresh()
+					else
+						local reason = (type(result) == "table" and result.reason) or "error"
+						_status.Text = "Cannot franchise: " .. tostring(reason)
+					end
+				end)
+			end
 		else
 			local u = config.unlock
 			newLabel(card, string.format("Lv %d · %d coins · %d gems", u.level, u.coins, u.gems),

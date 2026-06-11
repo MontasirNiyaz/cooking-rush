@@ -17,6 +17,8 @@ Most cooking games hard-code each dish. Here, the entire content layer is declar
 | Stations & their behaviour | `Config/Stations.lua` (`archetype` field) | None |
 | Customer types & patience | `Config/Customers.lua` | None |
 | Upgrade trees | `Config/Upgrades.lua` | None |
+| Recipe mastery curve | `Config/Mastery.lua` | None (one global curve covers every recipe) |
+| Prestige / franchise curve | `Config/Prestige.lua` | None (formula params only) |
 | A whole restaurant + its levels | `Config/Restaurants/<Name>.lua` | None |
 
 The **M6 milestone** exists specifically to prove this: adding the *Sushi* restaurant is a config-only change.
@@ -49,11 +51,13 @@ cooking-rush/
 │   │   │   ├── Stations.lua
 │   │   │   ├── Customers.lua
 │   │   │   ├── Upgrades.lua
+│   │   │   ├── Mastery.lua          # recipe-mastery grind curve (M7.1)
+│   │   │   ├── Prestige.lua         # franchise / prestige curve (M7.2)
 │   │   │   ├── GameConfig.lua
 │   │   │   └── Restaurants/{FastFood, Sushi}.lua
 │   │   ├── Modules/              # ── pure logic, no side effects ──
 │   │   │   ├── RecipeResolver.lua   # item + steps → dish
-│   │   │   ├── EconomyMath.lua      # serve value, combos, star ratings
+│   │   │   ├── EconomyMath.lua      # serve value, combos, stars, mastery & prestige math
 │   │   │   ├── LevelGenerator.lua   # procedurally builds a restaurant's levels
 │   │   │   ├── Schema.lua           # validates all config on boot
 │   │   │   └── Enums.lua
@@ -62,7 +66,7 @@ cooking-rush/
 │   ├── ServerScriptService/Server/
 │   │   ├── init.server.lua
 │   │   └── Services/             # DataService, EconomyService, LevelService,
-│   │                             # ProgressionService, UpgradeService
+│   │                             # ProgressionService, UpgradeService, MasteryService
 │   └── StarterPlayer/StarterPlayerScripts/Client/
 │       ├── init.client.lua
 │       ├── Controllers/          # Level, Station, Customer, Order, Combo, UI
@@ -103,7 +107,7 @@ When running inside Studio, the client auto-starts FastFood level 1 after a shor
 
 ## Testing
 
-Unit specs live in `tests/` (TestEZ format) and cover the pure-logic modules — `RecipeResolver`, `EconomyMath`, and `LevelGenerator` — which contain all the rules and no Roblox side effects, so they're cheap to test in isolation.
+Unit specs live in `tests/` (TestEZ format) and cover the pure-logic modules — `RecipeResolver`, `EconomyMath` (including the M7 mastery & prestige math), `LevelGenerator`, and `UpgradeMath` — which contain all the rules and no Roblox side effects, so they're cheap to test in isolation.
 
 The specs are synced to `ServerStorage.Tests` alongside a small **`TestRunner`** module. To run the whole suite inside Studio, enter Play mode and execute (command bar set to *Server*, or via the MCP `execute_luau`):
 
@@ -126,5 +130,8 @@ It prints `[Tests] N passed, M failed` and warns one line per failure. `TestRunn
 | **M4** | DataStore-backed profiles; server-side `SubmitLevelResult` validation; daily reward | ✅ Done |
 | **M5** | Restaurant unlocks; upgrade trees applied as modifiers; Shop / Upgrade UI | ✅ Done |
 | **M6** | Add the **Sushi** restaurant as pure config — proving zero engine code changes | ✅ Done |
+| **M7** | Meta-progression spine: **Recipe Mastery** (per-dish grind ladder) + **Restaurant Prestige** (franchise-for-multiplier loop, Prestige Tokens) | ✅ Done |
+
+M7 begins the incremental-growth meta layered over the M0–M6 single-restaurant loop. Both new systems are formula + config: no new content is authored, they multiply the value of every restaurant the generator already produces. See the [`COOKING_GAME_SPEC` M7–M12 roadmap](HANDOFF.md) for what's next (M8 chefs, M9 idle, M10 live-ops, M11 trading, M12 monetization).
 
 See [`HANDOFF.md`](HANDOFF.md) for detailed architecture notes, design decisions, and the per-milestone implementation plan.

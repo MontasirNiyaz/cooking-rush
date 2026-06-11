@@ -105,6 +105,57 @@ function Schema.validateRestaurants(restaurants: any, stationIds: any, recipeIds
 	return r
 end
 
+-- ── Mastery (M7.1) ─────────────────────────────────────────────────────────────
+function Schema.validateMastery(mastery: any, recipeIds: any): Result
+	local r: Result = { ok = true, errors = {} }
+	if type(mastery.xpPerServe) ~= "number" then err(r, "Mastery.xpPerServe must be number") end
+
+	local function validateThresholds(ctx: string, thresholds: any)
+		if type(thresholds) ~= "table" then
+			err(r, ctx .. ".thresholds must be table"); return
+		end
+		if thresholds[1] ~= 0 then err(r, ctx .. ".thresholds[1] must be 0 (level 1 = 0 xp)") end
+		for i = 2, #thresholds do
+			if type(thresholds[i]) ~= "number" then
+				err(r, ctx .. ".thresholds[" .. i .. "] must be number")
+			elseif thresholds[i] <= thresholds[i - 1] then
+				err(r, ctx .. ".thresholds must be strictly increasing at index " .. i)
+			end
+		end
+	end
+
+	validateThresholds("Mastery.default", mastery.defaultThresholds)
+	if type(mastery.defaultPerLevelBonus) ~= "table" then
+		err(r, "Mastery.defaultPerLevelBonus must be table")
+	end
+
+	-- Overrides must reference real recipes and keep valid shapes.
+	if type(mastery.overrides) == "table" then
+		for recipeId, ov in pairs(mastery.overrides) do
+			local ctx = "Mastery.overrides[" .. tostring(recipeId) .. "]"
+			if not recipeIds[recipeId] then err(r, ctx .. " unknown recipe id") end
+			if ov.thresholds ~= nil then validateThresholds(ctx, ov.thresholds) end
+			if ov.perLevelBonus ~= nil and type(ov.perLevelBonus) ~= "table" then
+				err(r, ctx .. ".perLevelBonus must be table")
+			end
+		end
+	end
+	return r
+end
+
+-- ── Prestige (M7.2) ──────────────────────────────────────────────────────────
+function Schema.validatePrestige(prestige: any): Result
+	local r: Result = { ok = true, errors = {} }
+	local NUM_FIELDS = { "maxLevel", "coinMultPerLevel", "tokensBase", "tokensPerLevel", "equipSlotsPerLevel" }
+	for _, f in ipairs(NUM_FIELDS) do
+		if type(prestige[f]) ~= "number" then err(r, "Prestige." .. f .. " must be number") end
+	end
+	if type(prestige.maxLevel) == "number" and prestige.maxLevel < 1 then
+		err(r, "Prestige.maxLevel must be >= 1")
+	end
+	return r
+end
+
 -- ── Master validator ──────────────────────────────────────────────────────────
 function Schema.validateAll()
 	local Shared = game:GetService("ReplicatedStorage").Shared
@@ -113,6 +164,8 @@ function Schema.validateAll()
 	local Recipes      = require(Shared.Config.Recipes)
 	local Restaurants  = require(Shared.Config.Restaurants)
 	local Customers    = require(Shared.Config.Customers)
+	local Mastery      = require(Shared.Config.Mastery)
+	local Prestige     = require(Shared.Config.Prestige)
 
 	local allErrors: { string } = {}
 
@@ -124,6 +177,8 @@ function Schema.validateAll()
 	collect(Schema.validateStations(Stations))
 	collect(Schema.validateRecipes(Recipes, Ingredients))
 	collect(Schema.validateRestaurants(Restaurants, Stations, Recipes))
+	collect(Schema.validateMastery(Mastery, Recipes))
+	collect(Schema.validatePrestige(Prestige))
 
 	-- Customers: minimal check
 	for id, c in pairs(Customers) do

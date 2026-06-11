@@ -17,6 +17,7 @@ Build a Roblox cooking game ("Cooking Rush") using a data-driven architecture wh
 | M4 — DataStore profiles, SubmitLevelResult server validation | **Complete** |
 | M5 — ProgressionService, UpgradeService, Shop UI | **Complete** |
 | M6 — Sushi restaurant (config-only) | **Complete** |
+| M7 — Meta-progression spine: Recipe Mastery + Restaurant Prestige | **Complete** (code + unit tests; live playthrough pending Rojo connect) |
 
 ---
 
@@ -84,27 +85,64 @@ function Station:interact(heldItemId: string?): (string?, boolean)
 | `src/StarterPlayer/StarterPlayerScripts/Client/Controllers/LevelController.lua` | `startLevel`, `addCoins`, `endLevel`, `StateChanged` signal, `CoinsChanged` signal |
 | `src/ReplicatedStorage/Shared/Config/Stations.lua` | All station configs including ingredient shelves |
 | `src/ReplicatedStorage/Shared/Config/Recipes.lua` | Recipe graph (cheeseburger, fries, cola, etc.) |
-| `src/ServerScriptService/Server/Services/LevelService.lua` | `RequestLevelStart` remote handler, calls `LevelGenerator.generate` |
-| `src/ServerScriptService/Server/Services/DataService.lua` | DataStore profiles; pcall-guarded, falls back to DEFAULT_PROFILE in Studio |
+| `src/ServerScriptService/Server/Services/LevelService.lua` | `RequestLevelStart` + `SubmitLevelResult` (validates coins **and** mastery serves) |
+| `src/ServerScriptService/Server/Services/DataService.lua` | DataStore profiles (v2: + `mastery`/`prestige`/`prestigeTokens`); pcall-guarded, falls back to DEFAULT_PROFILE in Studio |
+| `src/ServerScriptService/Server/Services/MasteryService.lua` | Server-authoritative recipe mastery: applies validated serve tallies → XP/levels |
+| `src/ServerScriptService/Server/Services/ProgressionService.lua` | XP/levels/unlocks + the **franchise** (prestige) transaction |
+| `src/ReplicatedStorage/Shared/Config/Mastery.lua` | Recipe-mastery curve (global default + sparse per-recipe overrides) |
+| `src/ReplicatedStorage/Shared/Config/Prestige.lua` | Prestige curve params (earnings mult, token grant, equip-slot hook for M8) |
 
 ---
 
-## Next Steps (M2)
+## M7 — Meta-progression spine (Recipe Mastery + Restaurant Prestige)
 
-### Goal
-Full level state machine: Idle → Intro (3 s) → Playing → Results. Customers have visible patience meters. Combo display updates in real time. Level ends when all customers served or timer expires. Results screen shows coins + stars.
+The first incremental-growth milestone. No new content is authored — both systems are
+formula + config that multiply the value of every restaurant the generator already makes.
 
-### What to implement
+### Design decisions
+- **Prestige scope = per-restaurant** (not whole-account rebirth). Per the roadmap's
+  recommendation: more forgiving, and it layers with the M8 chef equip-slot growth
+  (`Prestige.equipSlotsPerLevel` is a reserved hook for that).
+- **Serve reporting is batched, not per-serve.** The client tallies serves per recipe
+  during a level (`LevelController.serves`) and submits the tally inside the existing
+  `SubmitLevelResult` payload — no new per-serve remote to spam. The server clamps each
+  count to `EconomyMath.rosterRecipeCounts(level.spawns)` so mastery can't be farmed
+  past real play, then `MasteryService:applyServes` grants XP.
+- **Server-authoritative earnings, exactly.** Mastery (per-recipe tip mult) and prestige
+  (per-restaurant earnings mult) are folded into the client's *live* coin counter for
+  feel, and the server re-derives the **same** ceiling in `EconomyMath.theoreticalMax`
+  (now takes a `masteryMultFn` + `globalMult`) using the player's real profile values.
+  Because those values only grow through validated play, the ceiling can't be gamed.
+  Mastery XP for the just-played level is applied *after* the ceiling check so a level
+  never inflates its own validation.
 
-1. **LevelController** — `elapsed` timer increments on Heartbeat while Playing; `endLevel()` calculates stars via `EconomyMath.starRating(coins, targetCoins)` and fires `StateChanged("Results")`.
+### Where it lives
+- Pure math in `EconomyMath`: `masteryLevel`, `masteryTipMult`, `masteryCookSpeedMult`,
+  `masteryMult`, `prestigeMultiplier`, `prestigeTokenGrant`, `rosterRecipeCounts`
+  (all unit-tested — 23 new specs, run via `TestRunner.runAll()`).
+- `MasteryService` (server) owns mastery writes; `ProgressionService:franchise` owns the
+  prestige transaction (validate full 3-star completion → reset that restaurant's stars +
+  its stations' upgrades → bump prestige → grant Prestige Tokens).
+- Profile **v2**: added `mastery`, `prestige`, `prestigeTokens` (migration `[1]` in
+  `DataService`, reconcile + fallback handle existing saves).
+- UI: `ShopController` gained a **Recipe Mastery** section (level + progress bar per
+  unlocked-menu dish) and a **Franchise** button per restaurant (enabled only when every
+  level is 3-starred); status line now shows Prestige Tokens.
 
-2. **CustomerController patience UI** — each customer's seat Part gets a BillboardGui bar that drains as `customer.patience` falls. Red when < 25%.
+### `cookSpeed` mastery bonus — reserved
+`Mastery.defaultPerLevelBonus.cookSpeed` and `EconomyMath.masteryCookSpeedMult` exist and
+are tested, but are **not yet wired to live stations**: stations cook intermediate items
+shared across recipes, so mapping a recipe's mastery onto a station's `cookTime` needs a
+design pass (which dish "owns" a shared cook step?). Only the tip-value bonus affects live
+economy today. Wire cookSpeed when that ownership question is settled.
 
-3. **Results screen** — UIController listens for `StateChanged("Results")` and overlays a full-screen panel showing coins earned and star count (1–3 stars).
-
-4. **Combo label** — already wired; verify streak increments on serve and resets on angry departure.
-
-5. **Level timer** (optional for M2 — FastFood level 1 is customer-count-based not time-based, so `allDone` check in CustomerController already handles end-of-level).
+## Next Steps (M8 — Chef Collection & Recruitment)
+The headline collection/gacha system. Chefs are config rows whose `passives` are effect
+tags consumed by existing systems (`cookSpeedMult`, `tipMult`, `autoServe`, …). Build:
+`Chefs.lua` + `RecruitCrates.lua` configs, a server-authoritative seeded `RecruitService`
+with a pity counter, profile `chefs`/`equippedChefs` (equip cap grows on total prestige —
+the M7→M8 tie), a client `ChefController` that applies equipped passive tags at level
+start, and a duplicate→fusion sink. See the M7–M12 roadmap for the full schema.
 
 ### Full cheeseburger serve flow (reference for testing)
 1. **Bun Shelf** (back row) → E → hold `bun`

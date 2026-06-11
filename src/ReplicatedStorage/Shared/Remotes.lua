@@ -32,6 +32,8 @@ local Remotes = {
 	UnlockRestaurant     = makeRemote("RemoteFunction", "UnlockRestaurant"),
 	-- Client → Server: claim daily reward
 	ClaimDaily           = makeRemote("RemoteFunction", "ClaimDaily"),
+	-- Client → Server: franchise (prestige) a fully 3-starred restaurant
+	FranchiseRestaurant  = makeRemote("RemoteFunction", "FranchiseRestaurant"),
 	-- Client → Server: fetch own profile for UI
 	GetProfile           = makeRemote("RemoteFunction", "GetProfile"),
 }

@@ -21,22 +21,32 @@ export type Profile = {
 	upgrades: { [string]: number },
 	lastDailyClaim: number,
 	lastIncomeClaim: { [string]: number },
+	-- M7 meta-progression
+	mastery: { [string]: { level: number, xp: number } },  -- recipeId → mastery
+	prestige: { [string]: number },                        -- restaurantId → prestige level
+	prestigeTokens: number,                                -- soft-premium currency
 	version: number,
 }
 
-local CURRENT_VERSION = 1
+local CURRENT_VERSION = 2
 
 local DEFAULT_PROFILE: Profile = {
 	coins = 100, gems = 5, xp = 0, playerLevel = 1,
 	unlockedRestaurants = { fastfood = true },
 	levelStars = {}, upgrades = {},
 	lastDailyClaim = 0, lastIncomeClaim = {},
+	mastery = {}, prestige = {}, prestigeTokens = 0,
 	version = CURRENT_VERSION,
 }
 
 -- Schema migrations: index = version being migrated FROM
 local MIGRATIONS: { (Profile) -> () } = {
-	-- [1] = function(p) p.newField = "default" end,
+	-- v1 → v2: add M7 meta-progression fields.
+	[1] = function(p)
+		p.mastery        = p.mastery or {}
+		p.prestige       = p.prestige or {}
+		p.prestigeTokens = p.prestigeTokens or 0
+	end,
 }
 
 local store: DataStore = DataStoreService:GetDataStore(GameConfig.DATASTORE_NAME)
@@ -78,6 +88,8 @@ local function load(player: Player): Profile
 		profile.levelStars          = {}
 		profile.upgrades            = {}
 		profile.lastIncomeClaim     = {}
+		profile.mastery             = {}
+		profile.prestige            = {}
 	end
 	profiles[player.UserId] = profile
 	return profile

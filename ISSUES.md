@@ -80,6 +80,46 @@ The architecture's central claim, validated: the full game loop runs for Sushi w
 
 ---
 
+## 8. M7 — Meta-progression spine: Recipe Mastery + Restaurant Prestige `[milestone:M7]` — DONE
+
+First incremental-growth milestone. Both systems are formula + config (no authored
+content) so they multiply the value of every restaurant the generator already produces.
+
+### 8.1 Recipe Mastery
+- [x] `Config/Mastery.lua` — one global default curve (`defaultThresholds` +
+  `defaultPerLevelBonus`) covering every recipe, with sparse per-recipe `overrides` and a
+  pure `resolve(recipeId)`. Adding a recipe needs zero mastery config.
+- [x] Profile field `mastery = { [recipeId] = { level, xp } }` (DataService v2 + migration).
+- [x] `EconomyMath` mastery math: `masteryLevel`, `masteryTipMult`, `masteryCookSpeedMult`,
+  `masteryMult`; `serveValue` extended with an optional `earningsMult`. All pure + tested.
+- [x] **Server is the only writer.** Client tallies serves per recipe (`LevelController.serves`)
+  and submits them in `SubmitLevelResult`; server clamps each to the roster
+  (`EconomyMath.rosterRecipeCounts`) and `MasteryService:applyServes` grants XP.
+- [x] UI: per-dish mastery level + progress bar in the Shop panel (Recipe Mastery section).
+- [ ] *Reserved:* `cookSpeed` mastery bonus math exists/tested but isn't wired to live
+  stations yet (shared cook-step ownership needs a design pass — see HANDOFF M7 notes).
+
+### 8.2 Restaurant Prestige (Franchise)
+- [x] `Config/Prestige.lua` — curve params only (`coinMultPerLevel`, `tokensBase`,
+  `tokensPerLevel`, `maxLevel`, `equipSlotsPerLevel` hook for M8).
+- [x] `EconomyMath.prestigeMultiplier` / `prestigeTokenGrant` (pure + tested).
+- [x] Profile fields `prestige = { [restaurantId] = level }`, `prestigeTokens`.
+- [x] `ProgressionService:franchise` — validates every level is 3-starred, resets that
+  restaurant's stars + its stations' upgrades, bumps prestige, grants tokens; behind the
+  new `FranchiseRestaurant` remote. **Scope: per-restaurant** (roadmap recommendation).
+- [x] Earnings ceiling stays exact: `theoreticalMax` now folds in the player's real mastery
+  (`masteryMultFn`) + prestige (`globalMult`) so the server validates the boosted coins
+  without trusting the client.
+- [x] UI: Franchise button per restaurant (enabled only when fully 3-starred) + prestige
+  level / earnings multiplier display + Prestige Token balance in the Shop panel.
+
+**Verification:** `rojo build` compiles the whole project (all new files parse). The 23 new
+EconomyMath mastery/prestige assertions pass (run inline against the real implementations
+in Studio Edit; PASS=23 FAIL=0). A live in-avatar franchise/mastery playthrough is pending
+a Rojo connect — the live Studio tree wasn't synced this session.
+
+---
+
 ## 7. TestEZ specs cannot be run directly via `execute_luau` `[tech-debt]` — DONE
 
 The specs in `tests/` use bare `describe`/`it`/`expect` globals that TestEZ injects via `setfenv`. The earlier blocker was the lack of a runner, not the language — `setfenv` works fine in Studio (verified). Rather than vendor the full TestEZ library, a minimal runner provides the slice of the DSL the specs actually use.

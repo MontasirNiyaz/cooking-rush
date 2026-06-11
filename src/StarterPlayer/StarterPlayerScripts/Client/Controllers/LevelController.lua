@@ -18,6 +18,7 @@ export type LevelController = typeof({} :: {
 	elapsed: number,
 	coinsEarned: number,
 	stars: number,
+	serves: { [string]: number },
 
 	StateChanged: any,
 	CoinsChanged: any,
@@ -25,6 +26,7 @@ export type LevelController = typeof({} :: {
 	init:        (self: any) -> (),
 	startLevel:  (self: any, restaurantId: string, levelIndex: number) -> (),
 	addCoins:    (self: any, amount: number) -> (),
+	recordServe: (self: any, recipeId: string) -> (),
 	endLevel:    (self: any) -> (),
 })
 
@@ -41,6 +43,7 @@ LevelController.currentLevel = nil
 LevelController.elapsed      = 0
 LevelController.coinsEarned  = 0
 LevelController.stars        = 0
+LevelController.serves       = {}  -- recipeId → count served this level (for mastery)
 
 local _trove = Trove.new()
 
@@ -63,6 +66,7 @@ function LevelController:startLevel(restaurantId: string, levelIndex: number)
 	self.elapsed      = 0
 	self.coinsEarned  = 0
 	self.stars        = 0
+	self.serves       = {}
 	self:_setState(Enums.LevelState.Intro)
 
 	-- Brief intro delay before gameplay begins
@@ -76,6 +80,12 @@ end
 function LevelController:addCoins(amount: number)
 	self.coinsEarned += amount
 	self.CoinsChanged:Fire(self.coinsEarned, amount)
+end
+
+-- Tally a successful serve for mastery. Submitted with the level result; the
+-- server validates the tally against the roster before granting mastery XP.
+function LevelController:recordServe(recipeId: string)
+	self.serves[recipeId] = (self.serves[recipeId] or 0) + 1
 end
 
 function LevelController:endLevel()
@@ -98,6 +108,7 @@ function LevelController:endLevel()
 				levelIndex   = level.index,
 				coinsEarned  = self.coinsEarned,
 				stars        = self.stars,
+				serves       = self.serves,
 			})
 		end)
 	end

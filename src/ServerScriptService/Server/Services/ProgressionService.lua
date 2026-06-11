@@ -7,6 +7,8 @@ local DataService    = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
 local Remotes        = require(ReplicatedStorage.Shared.Remotes)
 local Restaurants    = require(ReplicatedStorage.Shared.Config.Restaurants)
+local Prestige       = require(ReplicatedStorage.Shared.Config.Prestige)
+local EconomyMath    = require(ReplicatedStorage.Shared.Modules.EconomyMath)
 
 local ProgressionService = {}
 
@@ -60,7 +62,73 @@ function ProgressionService:canUnlockRestaurant(player: Player, restaurantId: st
 	return true, "ok"
 end
 
+-- ── Prestige / Franchise (M7.2) ───────────────────────────────────────────────
+
+-- True only when EVERY level of the restaurant has been 3-starred.
+function ProgressionService:isFullyCompleted(player: Player, restaurantId: string): boolean
+	local profile = DataService:getProfile(player)
+	if not profile then return false end
+	local config = Restaurants[restaurantId]
+	if not config then return false end
+	for i = 1, config.levelCount do
+		if (profile.levelStars[restaurantId .. ":" .. i] or 0) < 3 then
+			return false
+		end
+	end
+	return true
+end
+
+function ProgressionService:canFranchise(player: Player, restaurantId: string): (boolean, string)
+	local profile = DataService:getProfile(player)
+	if not profile then return false, "no_profile" end
+	local config = Restaurants[restaurantId]
+	if not config then return false, "unknown_restaurant" end
+	if not profile.unlockedRestaurants[restaurantId] then return false, "not_unlocked" end
+	if (profile.prestige[restaurantId] or 0) >= Prestige.maxLevel then
+		return false, "max_prestige"
+	end
+	if not ProgressionService:isFullyCompleted(player, restaurantId) then
+		return false, "not_completed"
+	end
+	return true, "ok"
+end
+
+-- The franchise transaction: bump prestige, RESET this restaurant's level stars
+-- and its stations' upgrades, and grant Prestige Tokens. Per-restaurant scope, so
+-- other restaurants are untouched.
+function ProgressionService:franchise(player: Player, restaurantId: string): { ok: boolean, reason: string?, prestigeLevel: number?, tokens: number? }
+	local ok, reason = ProgressionService:canFranchise(player, restaurantId)
+	if not ok then return { ok = false, reason = reason } end
+
+	local profile = DataService:getProfile(player)
+	if not profile then return { ok = false, reason = "no_profile" } end
+	local config = Restaurants[restaurantId]
+
+	local newLevel = (profile.prestige[restaurantId] or 0) + 1
+	profile.prestige[restaurantId] = newLevel
+
+	-- Reset level stars for this restaurant only.
+	for i = 1, config.levelCount do
+		profile.levelStars[restaurantId .. ":" .. i] = nil
+	end
+	-- Reset upgrades for this restaurant's stations only.
+	for _, stationId in ipairs(config.stationIds) do
+		profile.upgrades[stationId] = nil
+	end
+
+	local tokens = EconomyMath.prestigeTokenGrant(newLevel, Prestige)
+	profile.prestigeTokens = (profile.prestigeTokens or 0) + tokens
+
+	DataService:save(player)
+	return { ok = true, prestigeLevel = newLevel, tokens = tokens }
+end
+
 function ProgressionService:init()
+	Remotes.FranchiseRestaurant.OnServerInvoke = function(player: Player, restaurantId: string)
+		if type(restaurantId) ~= "string" then return { ok = false, reason = "bad_args" } end
+		return ProgressionService:franchise(player, restaurantId)
+	end
+
 	Remotes.UnlockRestaurant.OnServerInvoke = function(player: Player, restaurantId: string)
 		local ok, reason = ProgressionService:canUnlockRestaurant(player, restaurantId)
 		if not ok then return { ok = false, reason = reason } end

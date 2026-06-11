@@ -7,6 +7,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RecipeResolver = require(ReplicatedStorage.Shared.Modules.RecipeResolver)
 local Recipes        = require(ReplicatedStorage.Shared.Config.Recipes)
 local GameConfig     = require(ReplicatedStorage.Shared.Config.GameConfig)
+local Mastery        = require(ReplicatedStorage.Shared.Config.Mastery)
+local Prestige       = require(ReplicatedStorage.Shared.Config.Prestige)
 local EconomyMath    = require(ReplicatedStorage.Shared.Modules.EconomyMath)
 local Signal         = require(ReplicatedStorage.Shared.Packages.Signal)
 
@@ -20,6 +22,24 @@ OrderController.ServeFail    = Signal.new()  -- fires(customerId, heldItemId)
 -- customer: Customer entity (has .orderIds, .tipCurve, .patienceFraction)
 -- heldItemId: the ingredient id the player is carrying
 -- Returns true on success.
+-- Combined mastery + prestige earnings multiplier for the active restaurant/recipe.
+-- Reads the shared profile cache; both factors default to 1 when the profile or
+-- field is missing. The server independently recomputes this same ceiling, so the
+-- client value here is purely for the live coin feel.
+local function earningsMult(recipeId: string, restaurantId: string?): number
+	local ProfileController = require(script.Parent.ProfileController)
+	local profile = ProfileController:get()
+	if not profile then return 1 end
+
+	local masteryEntry = profile.mastery and profile.mastery[recipeId]
+	local masteryMult  = EconomyMath.masteryMult(masteryEntry and masteryEntry.xp or 0, Mastery.resolve(recipeId))
+
+	local prestigeLevel = restaurantId and profile.prestige and profile.prestige[restaurantId] or 0
+	local prestigeMult  = EconomyMath.prestigeMultiplier(prestigeLevel, Prestige)
+
+	return masteryMult * prestigeMult
+end
+
 function OrderController:tryServe(customer: any, heldItemId: string): boolean
 	local LevelController = require(script.Parent.LevelController)
 	local ComboController = require(script.Parent.ComboController)
@@ -32,16 +52,19 @@ function OrderController:tryServe(customer: any, heldItemId: string): boolean
 			local recipe    = Recipes[recipeId]
 			local basePrice = recipe and recipe.basePrice or 5
 
+			local restaurantId = LevelController.currentLevel and LevelController.currentLevel.restaurantId
 			local coins = EconomyMath.serveValue(
 				basePrice,
 				customer:getPatienceFraction(),
 				customer.tipCurve,
 				ComboController.streak,
-				GameConfig
+				GameConfig,
+				earningsMult(recipeId, restaurantId)
 			)
 
 			ComboController:increment()
 			LevelController:addCoins(coins)
+			LevelController:recordServe(recipeId)
 			OrderController.ServeSuccess:Fire(customer.id, recipeId, coins)
 			return true
 		end
