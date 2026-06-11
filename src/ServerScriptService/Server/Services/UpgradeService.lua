@@ -8,35 +8,19 @@ local EconomyService = require(script.Parent.EconomyService)
 local Remotes        = require(ReplicatedStorage.Shared.Remotes)
 local Upgrades       = require(ReplicatedStorage.Shared.Config.Upgrades)
 local Stations       = require(ReplicatedStorage.Shared.Config.Stations)
+local UpgradeMath    = require(ReplicatedStorage.Shared.Modules.UpgradeMath)
 
 local UpgradeService = {}
 
 -- Returns a shallow-copy of the station config with upgrade modifiers applied.
--- Never mutates Stations.lua data.
+-- Never mutates Stations.lua data. Delegates the modifier math to the shared
+-- UpgradeMath module so client and server stay in lockstep.
 function UpgradeService:effectiveStation(player: Player, stationId: string): any
-	local base    = Stations[stationId]
+	local base = Stations[stationId]
 	if not base then return nil end
 	local profile = DataService:getProfile(player)
 	local level   = profile and profile.upgrades[stationId] or 0
-	if level == 0 then return base end
-
-	local tree = Upgrades[stationId]
-	if not tree then return base end
-
-	local effective = table.clone(base :: any)
-	for tier = 1, level do
-		local entry = tree.tiers[tier]
-		if entry then
-			local effect = entry.effect
-			local field  = effect.field
-			local current = (effective :: any)[field]
-			if type(current) == "number" then
-				if effect.mult then (effective :: any)[field] = current * effect.mult end
-				if effect.add  then (effective :: any)[field] = current + effect.add  end
-			end
-		end
-	end
-	return effective
+	return UpgradeMath.effectiveStation(base, Upgrades[stationId], level)
 end
 
 function UpgradeService:purchaseUpgrade(player: Player, stationId: string): { ok: boolean, reason: string? }

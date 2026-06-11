@@ -5,6 +5,7 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local RecipeResolver = require(ReplicatedStorage.Shared.Modules.RecipeResolver)
+local UpgradeMath    = require(ReplicatedStorage.Shared.Modules.UpgradeMath)
 local Recipes        = require(ReplicatedStorage.Shared.Config.Recipes)
 local Upgrades       = require(ReplicatedStorage.Shared.Config.Upgrades)
 local Signal         = require(ReplicatedStorage.Shared.Packages.Signal)
@@ -37,38 +38,20 @@ type CookerSlot = {
 	state: "cooking" | "done" | "burnt",
 }
 
--- ── Effective config (base + upgrade modifiers applied) ──────────────────────
-
-local function applyUpgrades(base: any, upgradeLevel: number): any
-	if upgradeLevel == 0 then return base end
-	local tree = Upgrades[base.id]
-	if not tree then return base end
-	local eff = table.clone(base :: any)
-	for tier = 1, upgradeLevel do
-		local entry = tree.tiers[tier]
-		if entry then
-			local f, current = entry.effect.field, (eff :: any)[entry.effect.field]
-			if type(current) == "number" then
-				if entry.effect.mult then (eff :: any)[f] = current * entry.effect.mult end
-				if entry.effect.add  then (eff :: any)[f] = current + entry.effect.add  end
-			end
-		end
-	end
-	return eff
-end
-
 -- ── Station constructor ───────────────────────────────────────────────────────
 
 local Station = {}
 Station.__index = Station
 
 function Station.new(baseConfig: any, upgradeLevel: number): Station
-	local cfg = applyUpgrades(baseConfig, upgradeLevel)
+	local cfg = UpgradeMath.effectiveStation(baseConfig, Upgrades[baseConfig.id], upgradeLevel)
 	local self = setmetatable({
-		id        = cfg.id,
-		config    = cfg,
-		archetype = cfg.archetype,
-		_trove    = Trove.new(),
+		id           = cfg.id,
+		config       = cfg,
+		archetype    = cfg.archetype,
+		_baseConfig  = baseConfig,    -- unmodified config; effective cfg is recomputed from this
+		_upgradeLevel = upgradeLevel,
+		_trove       = Trove.new(),
 
 		StateChanged = Signal.new(),
 		ItemReady    = Signal.new(),
@@ -86,6 +69,19 @@ function Station.new(baseConfig: any, upgradeLevel: number): Station
 		_added       = {} :: { string },
 	}, Station)
 	return self :: any
+end
+
+-- Recompute the effective config from the stored base config and a new upgrade
+-- level. Called when the player's upgrades change (e.g. at the start of a level
+-- after a shop purchase). Dispenser stock is refilled to the new cap.
+function Station:setUpgradeLevel(upgradeLevel: number)
+	if upgradeLevel == self._upgradeLevel then return end
+	self._upgradeLevel = upgradeLevel
+	self.config = UpgradeMath.effectiveStation(self._baseConfig, Upgrades[self._baseConfig.id], upgradeLevel)
+	if self.archetype == "Dispenser" then
+		self._stock = self.config.maxStock or 0
+		self._refillAccum = 0
+	end
 end
 
 -- ── Cooker behaviour ──────────────────────────────────────────────────────────

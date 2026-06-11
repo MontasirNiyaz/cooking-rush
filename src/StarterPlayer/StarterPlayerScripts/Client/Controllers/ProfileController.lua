@@ -11,13 +11,29 @@ local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local Remotes = require(ReplicatedStorage.Shared.Remotes)
+local Signal  = require(ReplicatedStorage.Shared.Packages.Signal)
 
 local ProfileController = {}
+
+-- Shared cache: this controller is the single client-side owner of the player's
+-- profile. Other controllers (Station, Shop) read it via get() and react to the
+-- Changed signal instead of each invoking GetProfile independently.
+ProfileController.Changed = Signal.new()  -- fires(profile)
 
 local _profile: any = nil
 local _balanceLabel:  TextLabel
 local _dailyButton:   TextButton
 local _feedbackLabel: TextLabel
+
+-- Returns the cached profile (may be nil until the first fetch resolves).
+function ProfileController:get(): any
+	return _profile
+end
+
+local function setProfile(profile: any)
+	_profile = profile
+	ProfileController.Changed:Fire(profile)
+end
 
 local function refreshBalance()
 	if not _profile then
@@ -36,13 +52,19 @@ local function fetchProfile()
 			return Remotes.GetProfile:InvokeServer()
 		end)
 		if ok and type(profile) == "table" then
-			_profile = profile
+			setProfile(profile)
 			refreshBalance()
 			return
 		end
 		task.wait(0.5)
 	end
 	refreshBalance()
+end
+
+-- Re-fetch the profile from the server. Exposed so other controllers can request
+-- a refresh after a server-authoritative change (purchase, unlock, level result).
+function ProfileController:refresh()
+	task.spawn(fetchProfile)
 end
 
 local function buildGui()
@@ -106,6 +128,7 @@ function ProfileController:init()
 		if ok and type(result) == "table" and result.ok then
 			if _profile then
 				_profile.coins = (_profile.coins or 0) + result.coins
+				ProfileController.Changed:Fire(_profile)
 			end
 			refreshBalance()
 			_feedbackLabel.TextColor3 = Color3.fromRGB(200, 255, 200)

@@ -44,6 +44,8 @@ local function setupPart(stationId: string, part: BasePart)
 		return
 	end
 
+	-- Start at upgrade level 0; the player's real levels are applied at level start
+	-- (see applyUpgradeLevels), once the profile has loaded.
 	local station = StationEntity.new(cfg, 0)
 	_stations[stationId] = station
 
@@ -100,6 +102,18 @@ local function setupPart(stationId: string, part: BasePart)
 	end)
 end
 
+-- Apply the player's current per-station upgrade levels to the live station
+-- entities. Read from the shared profile cache so cook/refill behaviour reflects
+-- purchases made in the shop. Called at the start of each level.
+local function applyUpgradeLevels()
+	local ProfileController = require(script.Parent.ProfileController)
+	local profile = ProfileController:get()
+	local upgrades = profile and profile.upgrades or {}
+	for sid, station in pairs(_stations) do
+		station:setUpgradeLevel(upgrades[sid] or 0)
+	end
+end
+
 function StationController:init()
 	local LevelController = require(script.Parent.LevelController)
 
@@ -116,6 +130,9 @@ function StationController:init()
 			for sid, pr in pairs(_prompts) do
 				pr.ActionText = promptLabel(sid, nil)
 			end
+		elseif newState == "Intro" then
+			-- Level beginning: apply the player's upgrades to live station behaviour.
+			applyUpgradeLevels()
 		end
 	end)
 

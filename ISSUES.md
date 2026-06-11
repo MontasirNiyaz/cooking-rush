@@ -55,11 +55,15 @@ path confirmed).
 
 ---
 
-## 5. M5 — Progression unlocks, upgrade trees & Shop UI `[milestone:M5]`
+## 5. M5 — Progression unlocks, upgrade trees & Shop UI `[milestone:M5]` — DONE
 
-- [ ] Restaurant unlock flow (`ProgressionService:canUnlockRestaurant` already exists) surfaced in UI
-- [ ] Apply `UpgradeService:effectiveStation` modifiers to live station behaviour
-- [ ] Build Upgrade / Shop UI screens
+- [x] Restaurant unlock flow surfaced in UI — `ShopController` lists every restaurant from `Config/Restaurants` with its unlocked state or unlock requirement (level/coins/gems); the Unlock button invokes `UnlockRestaurant`, server-authoritative via `ProgressionService:canUnlockRestaurant`. Verified: Sushi correctly gated with `level_required` at player level 1.
+- [x] Apply upgrade modifiers to live station behaviour — the duplicated effective-stat math (it lived in **both** `Station.lua` and `UpgradeService.lua`) was extracted to a pure shared `Modules/UpgradeMath.lua`, so client and server can't drift. `StationController` now applies each player's real per-station upgrade levels (via `Station:setUpgradeLevel`) at level start (`Intro`) instead of the hardcoded `0`. Verified: drink_dispenser maxStock 8→12 (+4) and grill cookTime 12→10.8 (×0.90) in the effective config.
+- [x] Build Upgrade / Shop UI screens — `ShopController` builds a single data-driven Shop panel (🛒 toggle): a **Station Upgrades** section (current level + next tier name/cost + Buy) and a **Restaurants** section, both generated entirely from config. `ProfileController` now owns the single client-side profile cache (`get()` / `Changed` signal / `refresh()`) so the shop, station upgrades, and balance HUD all read one source and refresh after a server-authoritative change.
+
+**Verified in Studio:** clean boot (no errors); a real `PurchaseUpgrade("drink_dispenser")` deducted coins 184→34 and bumped the level 0→1 (persisted server-side); an unaffordable grill upgrade (200 at 184 coins) was rejected with `insufficient_coins`; Sushi unlock gated with `level_required`. Full suite **63/63 pass** (+10 new `UpgradeMath` specs).
+
+**Remaining (future):** the balance HUD refreshes on join / level result / profile-Changed — purchases made *through the shop UI* update it via `refresh()`, but out-of-band currency changes won't reflect until the next refresh.
 
 ---
 
@@ -77,5 +81,5 @@ The architecture's central claim. `Config/Restaurants/Sushi.lua` and the Sushi s
 
 The specs in `tests/` use bare `describe`/`it`/`expect` globals that TestEZ injects via `setfenv`. The earlier blocker was the lack of a runner, not the language — `setfenv` works fine in Studio (verified). Rather than vendor the full TestEZ library, a minimal runner provides the slice of the DSL the specs actually use.
 
-- [x] Added `tests/TestRunner.lua` (synced to `ServerStorage.Tests.TestRunner`) — a minimal TestEZ-compatible runner (`describe`/`it`/`expect(x).to.equal(y)`/`.to.be.ok()`) that `setfenv`-injects the DSL and runs every sibling `*.spec` module. `runAll()` reports pass/fail. Current suite: 27/27 pass.
+- [x] Added `tests/TestRunner.lua` (synced to `ServerStorage.Tests.TestRunner`) — a minimal TestEZ-compatible runner (`describe`/`it`/`expect(x).to.equal(y)`/`.to.be.ok()`) that `setfenv`-injects the DSL and runs every sibling `*.spec` module. `runAll()` reports pass/fail. Current suite: 63/63 pass.
 - [x] Documented `run tests` steps in the README (Testing section).
