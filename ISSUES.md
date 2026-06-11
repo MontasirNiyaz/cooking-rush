@@ -13,15 +13,25 @@ Draft issues for Cooking Rush, derived from the roadmap and in-code markers. Rea
 
 ---
 
-## 2. M2 — Level state machine, patience meters, combo & star results `[milestone:M2]`
+## 2. M2 — Level state machine, patience meters, combo & star results `[milestone:M2]` — DONE (commit `e8bd759`)
 
 Full level loop: Idle → Intro (3s) → Playing → Results.
 
-- [ ] `LevelController.elapsed` timer increments on Heartbeat while Playing
-- [ ] `endLevel()` computes stars via `EconomyMath.starRating(coins, targetCoins)` and fires `StateChanged("Results")`
-- [ ] Per-customer patience UI (BillboardGui bar on the seat Part) that drains with `customer.patience`; red under 25%
-- [ ] Full-screen Results panel in `UIController` showing coins earned + star count
-- [ ] Verify combo streak increments on serve and resets on angry departure
+- [x] `LevelController.elapsed` timer increments on Heartbeat while Playing
+- [x] `endLevel()` computes stars via `EconomyMath.starsFor(coinsEarned, level.goals)` and fires `StateChanged("Results")` (stars stored on `LevelController.stars` *before* the state fires so the UI can read it)
+- [x] Per-customer patience UI (BillboardGui bar on the seat Part) that drains with `customer:getPatienceFraction()`; red under 25%
+- [x] Full-screen Results panel in `UIController` showing coins earned + star count
+- [x] Verify combo streak increments on serve and resets on angry departure
+
+**Also fixed (was blocking 3-star on level 1):** customers are now admitted
+only when a seat is free, so arrivals queue by time instead of being orphaned
+seatless. Previously level 1 (4 customers, 3 seats) stranded customer 4 with no
+prompt and no patience bar.
+
+Verified in Studio: unattended run drove Idle→Intro→Playing→Results with bars
+draining and going red <25%, and customer 4 re-seated on a freed seat. Attended
+run totaled 36 coins with the star filling correctly (combo + non-zero star
+path confirmed).
 
 ---
 
