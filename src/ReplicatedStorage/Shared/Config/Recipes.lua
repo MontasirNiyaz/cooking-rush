@@ -62,7 +62,7 @@ local Recipes: { [string]: Recipe } = {
 		id = "tuna_roll", displayName = "Tuna Roll",
 		icon = "rbxassetid://0",
 		steps = {
-			{ kind = "cook",     station = "fish_prep",   item = "tuna_slice" },
+			{ kind = "cook",     station = "tuna_prep",   item = "tuna_slice" },
 			{ kind = "assemble", base = "sushi_rice", add = { "tuna_slice", "nori" } },
 		},
 		basePrice = 16, prepHintSeconds = 15,

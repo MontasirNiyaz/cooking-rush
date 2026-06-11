@@ -67,13 +67,16 @@ path confirmed).
 
 ---
 
-## 6. M6 — Add the Sushi restaurant as pure config `[milestone:M6]`
+## 6. M6 — Add the Sushi restaurant as pure config `[milestone:M6]` — DONE
 
-The architecture's central claim. `Config/Restaurants/Sushi.lua` and the Sushi station/recipe/ingredient configs already exist — this milestone validates the full loop runs for Sushi with **zero new engine code**.
+The architecture's central claim, validated: the full game loop runs for Sushi with **zero new engine code**. The M6 commit touched only 3 config files + a world-build tool — no controller/service/entity changed (`git diff --stat`).
 
-- [ ] Build the Sushi kitchen world (stations + seats) in the place file
-- [ ] Play through Sushi level 1 end-to-end
-- [ ] Confirm no engine/controller code was modified to support it
+- [x] Completed the Sushi content (config-only) — the existing Sushi config had latent gaps: nothing produced `raw_salmon`, `raw_tuna`, `nori`, or `miso_base`, and `fish_prep` is salmon-only. Added four ingredient-shelf Dispensers + a `tuna_prep` Cooker to `Config/Stations.lua` (reusing the existing archetypes), and pointed `tuna_roll`'s cook step at `tuna_prep`. No new station behaviour code — just data.
+- [x] Build the Sushi kitchen world (stations + seats) — built 10 Sushi station Parts to the right of FastFood (X 20..48), sharing the existing 3 seats. The world isn't Rojo-tracked, so the builder is checked in as [`tools/build_sushi_world.lua`](tools/build_sushi_world.lua) (idempotent; run in the Edit command bar) — the version-controlled record of the layout.
+- [x] Validate the loop end-to-end — boot: Schema validates the new config and `StationController` wires **18 stations** (8 FastFood + 10 Sushi). `LevelGenerator.generate(sushi, 1)` yields the tutorial roster (salmon_nigiri + green_tea, goals 6/15/24). Drove the **whole Sushi menu** through the real `Station` archetypes from config alone: green_tea (dispense), salmon_nigiri (salmon shelf → fish_prep → rice → roller), tuna_roll (tuna shelf → tuna_prep → +nori +rice → roller), miso_soup (miso_base shelf → soup_pot) — each produced its final item and `salmon_nigiri` fulfils its order. The restaurant unlock gate itself was confirmed server-authoritative in M5 (Sushi rejected with `level_required`).
+- [x] Confirm no engine/controller code was modified — `git diff` for the M6 commit shows only `Config/Stations.lua`, `Config/Recipes.lua`, `Config/Restaurants/Sushi.lua`, and `tools/build_sushi_world.lua`.
+
+**Note:** a live in-avatar playthrough wasn't scripted (MCP can't drive the running client's UI/input). Verification used the actual `Station`/`RecipeResolver`/`LevelGenerator` modules the live game runs, exercised deterministically. To see it in-game: unlock Sushi (reach player level 10 + 2500 coins, or temporarily lower `Sushi.unlock`) and start Sushi level 1 from the menu flow.
 
 ---
 

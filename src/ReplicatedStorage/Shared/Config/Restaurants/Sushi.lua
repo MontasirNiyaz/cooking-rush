@@ -6,7 +6,7 @@ return {
 	displayName    = "Sakura Sushi",
 	unlock         = { level = 10, coins = 2500, gems = 0 },
 
-	stationIds     = { "fish_prep", "sushi_roller", "rice_dispenser", "soup_pot", "tea_dispenser" },
+	stationIds     = { "fish_prep", "tuna_prep", "sushi_roller", "rice_dispenser", "soup_pot", "tea_dispenser" },
 	menu           = { "salmon_nigiri", "tuna_roll", "miso_soup", "green_tea" },
 	customerTypeIds = { "casual", "tourist", "critic" },
 

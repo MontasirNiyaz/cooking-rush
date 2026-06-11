@@ -125,6 +125,6 @@ It prints `[Tests] N passed, M failed` and warns one line per failure. `TestRunn
 | **M3** | Wire `LevelGenerator` into `LevelController`; tune the 40-level difficulty curve; run specs | ✅ Done |
 | **M4** | DataStore-backed profiles; server-side `SubmitLevelResult` validation; daily reward | ✅ Done |
 | **M5** | Restaurant unlocks; upgrade trees applied as modifiers; Shop / Upgrade UI | ✅ Done |
-| **M6** | Add the **Sushi** restaurant as pure config — proving zero engine code changes | ⏳ Planned |
+| **M6** | Add the **Sushi** restaurant as pure config — proving zero engine code changes | ✅ Done |
 
 See [`HANDOFF.md`](HANDOFF.md) for detailed architecture notes, design decisions, and the per-milestone implementation plan.

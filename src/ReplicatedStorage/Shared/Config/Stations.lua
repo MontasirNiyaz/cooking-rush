@@ -103,6 +103,37 @@ local Stations: { [string]: Station } = {
 		archetype = "Dispenser", capacity = 1,
 		produces = "green_tea", refillTime = 2, maxStock = 8,
 	},
+	-- fish_prep is salmon-only (one Cooker input→output); tuna gets its own prep
+	-- station rather than extending the Cooker archetype — keeps this config-only.
+	tuna_prep = {
+		id = "tuna_prep", displayName = "Tuna Prep Station",
+		archetype = "Cooker", capacity = 2,
+		input = "raw_tuna", output = "tuna_slice",
+		cookTime = 10, burnTime = 12,
+		upgradeTreeId = "fish_prep",
+	},
+
+	-- ── Sushi ingredient shelves (effectively infinite stock) ──────────────────
+	raw_salmon_shelf = {
+		id = "raw_salmon_shelf", displayName = "Salmon Shelf",
+		archetype = "Dispenser", capacity = 1,
+		produces = "raw_salmon", refillTime = 1, maxStock = 999,
+	},
+	raw_tuna_shelf = {
+		id = "raw_tuna_shelf", displayName = "Tuna Shelf",
+		archetype = "Dispenser", capacity = 1,
+		produces = "raw_tuna", refillTime = 1, maxStock = 999,
+	},
+	nori_shelf = {
+		id = "nori_shelf", displayName = "Nori Shelf",
+		archetype = "Dispenser", capacity = 1,
+		produces = "nori", refillTime = 1, maxStock = 999,
+	},
+	miso_base_shelf = {
+		id = "miso_base_shelf", displayName = "Miso Base Shelf",
+		archetype = "Dispenser", capacity = 1,
+		produces = "miso_base", refillTime = 1, maxStock = 999,
+	},
 }
 
 return Stations
