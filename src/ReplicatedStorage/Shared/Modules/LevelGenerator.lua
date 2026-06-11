@@ -70,11 +70,14 @@ function LevelGenerator.generate(
 	recipes: { [string]: any }
 ): Level
 	local levelCount = restaurant.levelCount or 40
-	local t          = easeInOut(math.clamp((index - 1) / math.max(levelCount - 1, 1), 0, 1))
+	local raw        = math.clamp((index - 1) / math.max(levelCount - 1, 1), 0, 1)
+	local t          = easeInOut(raw)
 
 	local customerCount  = math.floor(lerp(gameConfig.MIN_CUSTOMERS, gameConfig.MAX_CUSTOMERS, t) + 0.5)
 	local spawnGap       = lerp(gameConfig.MAX_SPAWN_GAP, gameConfig.MIN_SPAWN_GAP, t)
-	local maxOrders      = 1 + math.floor(t * 2)
+	-- Order complexity ramps on linear progress (not the smoothstep `t`) so
+	-- multi-item orders appear in the mid-game instead of only at the very end.
+	local maxOrders      = math.max(1, math.floor(lerp(gameConfig.MIN_MAX_ORDERS, gameConfig.MAX_MAX_ORDERS, raw) + 0.5))
 	local patienceScale  = lerp(gameConfig.MAX_PATIENCE_SCALE, gameConfig.MIN_PATIENCE_SCALE, t)
 
 	local menu: { string }          = restaurant.menu

@@ -15,6 +15,8 @@ return function()
 		MAX_SPAWN_GAP       = 12,
 		MIN_SPAWN_GAP       = 3,
 		SPAWN_GAP_JITTER    = 0.3,
+		MIN_MAX_ORDERS      = 1,
+		MAX_MAX_ORDERS      = 3,
 	}
 
 	local MOCK_RECIPES = {

@@ -105,6 +105,14 @@ When running inside Studio, the client auto-starts FastFood level 1 after a shor
 
 Unit specs live in `tests/` (TestEZ format) and cover the pure-logic modules — `RecipeResolver`, `EconomyMath`, and `LevelGenerator` — which contain all the rules and no Roblox side effects, so they're cheap to test in isolation.
 
+The specs are synced to `ServerStorage.Tests` alongside a small **`TestRunner`** module. To run the whole suite inside Studio, enter Play mode and execute (command bar set to *Server*, or via the MCP `execute_luau`):
+
+```lua
+require(game.ServerStorage.Tests.TestRunner).runAll()
+```
+
+It prints `[Tests] N passed, M failed` and warns one line per failure. `TestRunner` provides just the slice of the TestEZ DSL the specs use (`describe`, `it`, `expect(x).to.equal(y)`, `expect(x).to.be.ok()`), injected via `setfenv` — so the specs run unmodified without vendoring the full TestEZ library.
+
 ---
 
 ## Roadmap
@@ -113,8 +121,8 @@ Unit specs live in `tests/` (TestEZ format) and cover the pure-logic modules —
 |-----------|-------|--------|
 | **M0** | Project skeleton, full config layer, pure-logic modules, server/client stubs | ✅ Done |
 | **M1** | Three station archetypes wired to 3D interaction; serve a cheeseburger end-to-end | ✅ Done |
-| **M2** | Full level state machine (Intro → Playing → Results), patience meters, combo, timer, star calc | ⏳ Planned |
-| **M3** | Wire `LevelGenerator` into `LevelController`; tune the 40-level difficulty curve; run specs | ⏳ Planned |
+| **M2** | Full level state machine (Intro → Playing → Results), patience meters, combo, timer, star calc | ✅ Done |
+| **M3** | Wire `LevelGenerator` into `LevelController`; tune the 40-level difficulty curve; run specs | ✅ Done |
 | **M4** | DataStore-backed profiles; server-side `SubmitLevelResult` validation; daily reward | ⏳ Planned |
 | **M5** | Restaurant unlocks; upgrade trees applied as modifiers; Shop / Upgrade UI | ⏳ Planned |
 | **M6** | Add the **Sushi** restaurant as pure config — proving zero engine code changes | ⏳ Planned |

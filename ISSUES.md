@@ -35,12 +35,12 @@ path confirmed).
 
 ---
 
-## 3. M3 — Wire LevelGenerator into LevelController & tune difficulty `[milestone:M3]`
+## 3. M3 — Wire LevelGenerator into LevelController & tune difficulty `[milestone:M3]` — DONE
 
-- [ ] Replace any static spawn list with `LevelGenerator.generate(restaurant, levelIndex)`
-- [ ] Generate FastFood's 40 levels from config
-- [ ] Tune the difficulty curve (customer rate, patience, order complexity)
-- [ ] Run the TestEZ specs in `tests/` via a Studio test runner
+- [x] Replace any static spawn list with `LevelGenerator.generate(...)` — already wired in `LevelService` (`RequestLevelStart` + server-side `SubmitLevelResult` re-generation). No static list existed.
+- [x] Generate FastFood's 40 levels from config — verified all 40 indices produce valid rosters + ordered star goals.
+- [x] Tune the difficulty curve (customer rate, patience, order complexity) — order complexity was flat (single-item orders through ~level 20 because `maxOrders` rode the smoothstep `t`). Made it **config-driven** (`GameConfig.MIN_MAX_ORDERS` / `MAX_MAX_ORDERS`) and ramped on *linear* progress: now ~lvl 1–10 single-item, 11–30 up to 2-item, 31–40 up to 3-item. Customer count / patience / spawn gap were already healthy.
+- [x] Run the TestEZ specs in `tests/` via a Studio test runner — see issue #7 below; **27/27 pass**.
 
 ---
 
@@ -71,9 +71,9 @@ The architecture's central claim. `Config/Restaurants/Sushi.lua` and the Sushi s
 
 ---
 
-## 7. TestEZ specs cannot be run directly via `execute_luau` `[tech-debt]`
+## 7. TestEZ specs cannot be run directly via `execute_luau` `[tech-debt]` — DONE
 
-The specs in `tests/` use bare `describe`/`it`/`expect` globals that TestEZ injects via `setfenv`, which is unavailable under `--!strict` Luau. M0 was verified with manual assertions instead.
+The specs in `tests/` use bare `describe`/`it`/`expect` globals that TestEZ injects via `setfenv`. The earlier blocker was the lack of a runner, not the language — `setfenv` works fine in Studio (verified). Rather than vendor the full TestEZ library, a minimal runner provides the slice of the DSL the specs actually use.
 
-- [ ] Add a proper TestEZ runner script (placed in `ServerStorage.Tests`) that runs the suite inside Studio
-- [ ] Document `run tests` steps in the README
+- [x] Added `tests/TestRunner.lua` (synced to `ServerStorage.Tests.TestRunner`) — a minimal TestEZ-compatible runner (`describe`/`it`/`expect(x).to.equal(y)`/`.to.be.ok()`) that `setfenv`-injects the DSL and runs every sibling `*.spec` module. `runAll()` reports pass/fail. Current suite: 27/27 pass.
+- [x] Documented `run tests` steps in the README (Testing section).

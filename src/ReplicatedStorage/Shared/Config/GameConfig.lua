@@ -15,6 +15,10 @@ return {
 	MAX_SPAWN_GAP           = 12,    -- seconds between arrivals at min difficulty
 	MIN_SPAWN_GAP           = 3,     -- seconds between arrivals at max difficulty
 	SPAWN_GAP_JITTER        = 0.3,   -- fraction of gap added as random noise
+	-- Order complexity: max simultaneous orders per customer. Ramps on linear
+	-- level progress so 2-item orders appear mid-game and 3-item orders late.
+	MIN_MAX_ORDERS          = 1,     -- early levels: single-item orders
+	MAX_MAX_ORDERS          = 3,     -- final levels: up to 3-item orders
 
 	-- Economy
 	DEFAULT_LEVEL_DURATION  = 0,     -- 0 = roster-exhausted mode

@@ -12,8 +12,8 @@ Build a Roblox cooking game ("Cooking Rush") using a data-driven architecture wh
 |-----------|--------|
 | M0 — Project skeleton, config, pure logic, server/client stubs | **Complete** |
 | M1 — Station archetypes, 3D interaction, serve a cheeseburger | **Complete** (code + world) |
-| M2 — Full level loop, patience meters, combo, timer, stars | Pending |
-| M3 — LevelGenerator → LevelController, unit tests | Pending |
+| M2 — Full level loop, patience meters, combo, timer, stars | **Complete** |
+| M3 — LevelGenerator → LevelController, unit tests | **Complete** |
 | M4 — DataStore profiles, SubmitLevelResult server validation | Pending |
 | M5 — ProgressionService, UpgradeService, Shop UI | Pending |
 | M6 — Sushi restaurant (config-only) | Pending |
