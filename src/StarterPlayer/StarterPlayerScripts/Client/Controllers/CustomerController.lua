@@ -27,6 +27,36 @@ local _seats: { BasePart }      = {}
 local _seatFree: { boolean }    = {}
 local _customerSeat: { [string]: number } = {}  -- customerId → seat index
 local _seatPrompt: { [number]: ProximityPrompt } = {}
+local _seatBar:    { [number]: BillboardGui } = {}   -- seat index → patience BillboardGui
+local _seatBarFill: { [number]: Frame } = {}         -- seat index → fill bar Frame
+
+-- Builds a floating patience bar above a seat. Returns the fill Frame to drive.
+local function makePatienceBar(seat: BasePart): (BillboardGui, Frame)
+	local bb = Instance.new("BillboardGui")
+	bb.Name          = "PatienceBar"
+	bb.Size          = UDim2.new(0, 120, 0, 16)
+	bb.StudsOffset   = Vector3.new(0, 3.5, 0)
+	bb.AlwaysOnTop   = true
+	bb.MaxDistance   = 60
+	bb.Parent        = seat
+
+	local bg = Instance.new("Frame")
+	bg.Name                 = "Bg"
+	bg.Size                 = UDim2.new(1, 0, 1, 0)
+	bg.BackgroundColor3     = Color3.fromRGB(20, 20, 20)
+	bg.BackgroundTransparency = 0.3
+	bg.BorderSizePixel      = 0
+	bg.Parent               = bb
+
+	local fill = Instance.new("Frame")
+	fill.Name             = "Fill"
+	fill.Size             = UDim2.new(1, 0, 1, 0)
+	fill.BackgroundColor3 = Color3.fromRGB(80, 220, 90)
+	fill.BorderSizePixel  = 0
+	fill.Parent           = bg
+
+	return bb, fill
+end
 
 local function allDone(level: any): boolean
 	return _nextSpawnIndex > #level.spawns and next(_active) == nil
@@ -56,6 +86,13 @@ local function releaseSeat(customerId: string)
 		_seatPrompt[idx] = nil
 	end
 
+	local bar = _seatBar[idx]
+	if bar then
+		bar:Destroy()
+		_seatBar[idx]     = nil
+		_seatBarFill[idx] = nil
+	end
+
 	local seat = _seats[idx]
 	if seat then
 		seat.BrickColor = BrickColor.new("Medium stone grey")
@@ -78,6 +115,11 @@ local function attachToSeat(customer: any, idx: number)
 	prompt.HoldDuration = 0
 	prompt.Parent = seat
 	_seatPrompt[idx] = prompt
+
+	-- Patience bar above the seat
+	local bb, fill = makePatienceBar(seat)
+	_seatBar[idx]     = bb
+	_seatBarFill[idx] = fill
 
 	prompt.Triggered:Connect(function(_player: Player)
 		if customer.state ~= Enums.CustomerState.Waiting then return end
@@ -126,14 +168,19 @@ function CustomerController:init()
 		if newState == Enums.LevelState.Playing then
 			_active         = {}
 			_nextSpawnIndex = 1
-			-- Reset seat colours
+			_customerSeat   = {}
+			-- Reset seat colours and tear down any leftover prompts/bars
 			for i, seat in ipairs(_seats) do
 				seat.BrickColor = BrickColor.new("Medium stone grey")
 				_seatFree[i] = true
-				_customerSeat = {}
 				if _seatPrompt[i] then
 					_seatPrompt[i]:Destroy()
 					_seatPrompt[i] = nil
+				end
+				if _seatBar[i] then
+					_seatBar[i]:Destroy()
+					_seatBar[i]     = nil
+					_seatBarFill[i] = nil
 				end
 			end
 		elseif newState == Enums.LevelState.Idle then
@@ -152,10 +199,16 @@ function CustomerController:init()
 		local level = LevelController.currentLevel
 		if not level then return end
 
-		-- Spawn pending customers
+		-- Spawn pending customers. A customer is admitted only when a seat is
+		-- free, so arrivals queue by time instead of being orphaned without a
+		-- seat (and therefore unservable + with no visible patience bar).
 		while _nextSpawnIndex <= #level.spawns do
 			local entry = level.spawns[_nextSpawnIndex]
 			if LevelController.elapsed < entry.atSecond then break end
+
+			-- Hold the next arrival until a seat opens up.
+			local seatIdx = freeSeat()
+			if not seatIdx then break end
 
 			local archetype = Customers[entry.customerTypeId]
 			if not archetype then
@@ -168,13 +221,7 @@ function CustomerController:init()
 			_active[customer.id] = customer
 			_nextSpawnIndex += 1
 
-			-- Assign a seat
-			local seatIdx = freeSeat()
-			if seatIdx then
-				attachToSeat(customer, seatIdx)
-			else
-				warn("[CustomerController] No free seats for customer " .. customer.id)
-			end
+			attachToSeat(customer, seatIdx)
 
 			CustomerController.CustomerArrived:Fire(customer)
 			print(string.format("[CustomerController] Customer %s arrived (orders: %s)",
@@ -184,6 +231,19 @@ function CustomerController:init()
 		-- Tick patience and handle departures
 		for id, customer in pairs(_active) do
 			customer:tick(dt)
+
+			-- Drive the patience bar for this customer's seat
+			local seatIdx = _customerSeat[id]
+			if seatIdx then
+				local fill = _seatBarFill[seatIdx]
+				if fill then
+					local frac = customer:getPatienceFraction()
+					fill.Size = UDim2.new(frac, 0, 1, 0)
+					fill.BackgroundColor3 = frac < 0.25
+						and Color3.fromRGB(220, 60, 60)
+						or  Color3.fromRGB(80, 220, 90)
+				end
+			end
 
 			local leaving = customer.state == Enums.CustomerState.Angry
 				or customer.state == Enums.CustomerState.Leaving

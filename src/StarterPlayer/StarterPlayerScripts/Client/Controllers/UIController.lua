@@ -12,6 +12,11 @@ local _comboLabel:  TextLabel
 local _heldLabel:   TextLabel
 local _statusLabel: TextLabel
 
+-- Results overlay
+local _resultsFrame: Frame
+local _resultsStars: TextLabel
+local _resultsCoins: TextLabel
+
 local function makeLabel(parent: Instance, name: string, text: string,
 	pos: UDim2, size: UDim2, xAlign: Enum.TextXAlignment?): TextLabel
 	local lbl = Instance.new("TextLabel")
@@ -28,6 +33,8 @@ local function makeLabel(parent: Instance, name: string, text: string,
 	lbl.Parent             = parent
 	return lbl
 end
+
+local buildResults  -- forward declaration; defined after buildGui
 
 local function buildGui()
 	local player = Players.LocalPlayer
@@ -50,6 +57,66 @@ local function buildGui()
 
 	_heldLabel = makeLabel(gui, "HeldItem", "Holding: nothing",
 		UDim2.new(0.35, 0, 1, -52), UDim2.new(0.3, 0, 0, 44))
+
+	buildResults(gui)
+end
+
+-- Full-screen results overlay, hidden until the level reaches the Results state.
+function buildResults(gui: ScreenGui)
+	local frame = Instance.new("Frame")
+	frame.Name                   = "Results"
+	frame.Size                   = UDim2.new(1, 0, 1, 0)
+	frame.BackgroundColor3       = Color3.fromRGB(0, 0, 0)
+	frame.BackgroundTransparency = 0.35
+	frame.Visible                = false
+	frame.ZIndex                 = 10
+	frame.Parent                 = gui
+
+	local panel = Instance.new("Frame")
+	panel.Name                 = "Panel"
+	panel.AnchorPoint          = Vector2.new(0.5, 0.5)
+	panel.Position             = UDim2.new(0.5, 0, 0.5, 0)
+	panel.Size                 = UDim2.new(0, 420, 0, 280)
+	panel.BackgroundColor3     = Color3.fromRGB(28, 28, 34)
+	panel.BorderSizePixel      = 0
+	panel.ZIndex               = 11
+	panel.Parent               = frame
+
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0, 16)
+	corner.Parent       = panel
+
+	local title = makeLabel(panel, "Title", "Level Complete!",
+		UDim2.new(0.1, 0, 0.06, 0), UDim2.new(0.8, 0, 0, 48))
+	title.BackgroundTransparency = 1
+	title.ZIndex                 = 12
+
+	_resultsStars = makeLabel(panel, "Stars", "☆ ☆ ☆",
+		UDim2.new(0.1, 0, 0.36, 0), UDim2.new(0.8, 0, 0, 72))
+	_resultsStars.BackgroundTransparency = 1
+	_resultsStars.TextColor3             = Color3.fromRGB(255, 209, 64)
+	_resultsStars.ZIndex                 = 12
+
+	_resultsCoins = makeLabel(panel, "Coins", "Coins: 0",
+		UDim2.new(0.1, 0, 0.66, 0), UDim2.new(0.8, 0, 0, 44))
+	_resultsCoins.BackgroundTransparency = 1
+	_resultsCoins.ZIndex                 = 12
+
+	_resultsFrame = frame
+end
+
+local STAR_FILLED = "★"
+local STAR_EMPTY  = "☆"
+
+local function showResults(stars: number, coins: number)
+	local filled = math.clamp(stars, 0, 3)
+	local parts = {}
+	for i = 1, 3 do
+		parts[i] = i <= filled and STAR_FILLED or STAR_EMPTY
+	end
+	_resultsStars.Text = table.concat(parts, " ")
+	_resultsCoins.Text = string.format("Coins: %d", coins)
+	_resultsFrame.Visible = true
 end
 
 function UIController:init()
@@ -76,12 +143,16 @@ function UIController:init()
 			_statusLabel.Text = "Waiting…"
 			_coinsLabel.Text  = "Coins: 0"
 			_comboLabel.Text  = "x1.0"
+			_resultsFrame.Visible = false
 		elseif newState == Enums.LevelState.Intro then
 			_statusLabel.Text = "Get ready!"
+			_resultsFrame.Visible = false
 		elseif newState == Enums.LevelState.Playing then
 			_statusLabel.Text = "Cooking!"
+			_resultsFrame.Visible = false
 		elseif newState == Enums.LevelState.Results then
 			_statusLabel.Text = string.format("Done!  %d coins", LevelController.coinsEarned)
+			showResults(LevelController.stars, LevelController.coinsEarned)
 		end
 	end)
 

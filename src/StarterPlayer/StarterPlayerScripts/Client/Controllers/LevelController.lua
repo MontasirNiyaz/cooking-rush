@@ -17,6 +17,7 @@ export type LevelController = typeof({} :: {
 	currentLevel: any,
 	elapsed: number,
 	coinsEarned: number,
+	stars: number,
 
 	StateChanged: any,
 	CoinsChanged: any,
@@ -39,6 +40,7 @@ LevelController.state        = Enums.LevelState.Idle
 LevelController.currentLevel = nil
 LevelController.elapsed      = 0
 LevelController.coinsEarned  = 0
+LevelController.stars        = 0
 
 local _trove = Trove.new()
 
@@ -60,6 +62,7 @@ function LevelController:startLevel(restaurantId: string, levelIndex: number)
 	self.currentLevel = level
 	self.elapsed      = 0
 	self.coinsEarned  = 0
+	self.stars        = 0
 	self:_setState(Enums.LevelState.Intro)
 
 	-- Brief intro delay before gameplay begins
@@ -77,19 +80,24 @@ end
 
 function LevelController:endLevel()
 	if self.state ~= Enums.LevelState.Playing then return end
-	self:_setState(Enums.LevelState.Results)
 
-	-- Submit result to server for validation and rewards
+	-- Compute stars BEFORE firing Results so UI can read self.stars on the state change.
 	local level = self.currentLevel
 	if level then
 		local EconomyMath = require(ReplicatedStorage.Shared.Modules.EconomyMath)
-		local stars = EconomyMath.starsFor(self.coinsEarned, level.goals)
+		self.stars = EconomyMath.starsFor(self.coinsEarned, level.goals)
+	end
+
+	self:_setState(Enums.LevelState.Results)
+
+	-- Submit result to server for validation and rewards
+	if level then
 		task.spawn(function()
 			Remotes.SubmitLevelResult:InvokeServer({
 				restaurantId = level.restaurantId,
 				levelIndex   = level.index,
 				coinsEarned  = self.coinsEarned,
-				stars        = stars,
+				stars        = self.stars,
 			})
 		end)
 	end
