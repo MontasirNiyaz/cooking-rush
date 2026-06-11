@@ -1,6 +1,9 @@
 --!strict
--- Loads and saves player profiles. Session-locked; one active save per player.
+-- Loads and saves player profiles.
 -- All other services read/write through getProfile() — never touch DataStore directly.
+-- Durability: at most one in-flight save per player, retry-with-backoff on failure,
+-- and a BindToClose flush so the final session state is persisted on shutdown.
+-- (Full cross-server session locking is future work — see ISSUES.md.)
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players          = game:GetService("Players")
@@ -38,6 +41,9 @@ local MIGRATIONS: { (Profile) -> () } = {
 
 local store: DataStore = DataStoreService:GetDataStore(GameConfig.DATASTORE_NAME)
 local profiles: { [number]: Profile } = {}
+local saving:   { [number]: boolean } = {}  -- userId → save in flight (no overlap)
+
+local SAVE_RETRIES = 3
 
 local DataService = {}
 
@@ -78,9 +84,32 @@ local function load(player: Player): Profile
 end
 
 local function save(player: Player)
-	local p = profiles[player.UserId]
+	local userId = player.UserId
+	local p = profiles[userId]
 	if not p then return end
-	pcall(store.SetAsync, store, "player_" .. player.UserId, p)
+	if saving[userId] then return end  -- a save is already in flight for this player
+	saving[userId] = true
+
+	local key = "player_" .. userId
+	for attempt = 1, SAVE_RETRIES do
+		-- UpdateAsync is atomic and queues per key; the transform ignores the old
+		-- value because the in-memory profile is authoritative for this session.
+		local ok, err = pcall(function()
+			store:UpdateAsync(key, function()
+				return p
+			end)
+		end)
+		if ok then
+			saving[userId] = false
+			return
+		end
+		warn(string.format("[DataService] save attempt %d/%d for %s failed: %s",
+			attempt, SAVE_RETRIES, player.Name, tostring(err)))
+		task.wait(attempt)  -- linear backoff
+	end
+
+	warn(string.format("[DataService] GAVE UP saving %s after %d attempts", player.Name, SAVE_RETRIES))
+	saving[userId] = false
 end
 
 function DataService:init()
@@ -104,6 +133,22 @@ function DataService:init()
 	for _, player in ipairs(Players:GetPlayers()) do
 		load(player)
 	end
+
+	-- Flush every active profile on server shutdown so the final session state
+	-- isn't lost. BindToClose blocks shutdown (up to ~30s) until this returns.
+	game:BindToClose(function()
+		local pending = 0
+		for _, player in ipairs(Players:GetPlayers()) do
+			pending += 1
+			task.spawn(function()
+				save(player)
+				pending -= 1
+			end)
+		end
+		while pending > 0 do
+			task.wait()
+		end
+	end)
 end
 
 function DataService:getProfile(player: Player): Profile?

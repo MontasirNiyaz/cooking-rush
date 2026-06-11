@@ -119,4 +119,28 @@ return function()
 			expect(r.coins).to.equal(0)
 		end)
 	end)
+
+	describe("canClaimDaily", function()
+		local DAY = 86400
+
+		it("is false immediately after a claim", function()
+			expect(EconomyMath.canClaimDaily(1000, 1000, DAY)).to.equal(false)
+		end)
+
+		it("is false before the interval elapses", function()
+			expect(EconomyMath.canClaimDaily(0, DAY - 1, DAY)).to.equal(false)
+		end)
+
+		it("is true exactly at the interval boundary", function()
+			expect(EconomyMath.canClaimDaily(0, DAY, DAY)).to.equal(true)
+		end)
+
+		it("is true well past the interval", function()
+			expect(EconomyMath.canClaimDaily(0, DAY * 3, DAY)).to.equal(true)
+		end)
+
+		it("is true on a fresh profile (lastClaim 0)", function()
+			expect(EconomyMath.canClaimDaily(0, 9999999, DAY)).to.equal(true)
+		end)
+	end)
 end

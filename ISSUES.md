@@ -44,12 +44,14 @@ path confirmed).
 
 ---
 
-## 4. M4 — DataStore profiles & authoritative level-result validation `[milestone:M4]`
+## 4. M4 — DataStore profiles & authoritative level-result validation `[milestone:M4]` — DONE
 
-- [ ] `DataService` full DataStore profile load/save (currently falls back to `DEFAULT_PROFILE` when DataStore is unavailable)
-- [ ] Server-side `SubmitLevelResult` validation (never trust client coin/star totals)
-- [ ] Persist stars/coins; wire `EconomyService` + `ProgressionService:recordStars`
-- [ ] Daily reward (`EconomyService:claimDaily`) reachable from UI
+- [x] `DataService` full DataStore profile load/save — load already had GetAsync + reconcile + migrations + autosave; **added durability**: `BindToClose` shutdown flush, `UpdateAsync` + retry-with-backoff, and a per-player overlap guard. Still falls back to `DEFAULT_PROFILE` when the DataStore is unavailable (Studio without API access). Verified real persistence in Studio (a profile loaded coins=184 across sessions).
+- [x] Server-side `SubmitLevelResult` validation — already present in `LevelService`: type checks, server-side level re-generation, `theoreticalMax` overage rejection, star clamp. Confirmed.
+- [x] Persist stars/coins; wire `EconomyService` + `ProgressionService:recordStars` — already wired in `SubmitLevelResult`. Confirmed.
+- [x] Daily reward reachable from UI — added `ProfileController` (client): fetches `GetProfile` (with a join-race retry), shows persistent coins/gems, and a **Daily Reward** button that invokes `ClaimDaily`. Extracted the eligibility rule to a pure `EconomyMath.canClaimDaily` (unit-tested). Verified end-to-end: claim → +50, repeat → already-claimed, balance persisted.
+
+**Remaining (future):** full cross-server session locking (current durability is BindToClose + retry, not a lock token). Persistent-balance HUD currently refreshes on join and after a level result.
 
 ---
 

@@ -8,6 +8,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local DataService = require(script.Parent.DataService)
 local Remotes     = require(ReplicatedStorage.Shared.Remotes)
 local GameConfig  = require(ReplicatedStorage.Shared.Config.GameConfig)
+local EconomyMath = require(ReplicatedStorage.Shared.Modules.EconomyMath)
 
 local EconomyService = {}
 
@@ -43,7 +44,7 @@ function EconomyService:claimDaily(player: Player): { coins: number, ok: boolean
 	local profile = DataService:getProfile(player)
 	if not profile then return { coins = 0, ok = false } end
 	local now = os.time()
-	if now - profile.lastDailyClaim < GameConfig.DAILY_INTERVAL_SECONDS then
+	if not EconomyMath.canClaimDaily(profile.lastDailyClaim, now, GameConfig.DAILY_INTERVAL_SECONDS) then
 		return { coins = 0, ok = false }
 	end
 	local amount = GameConfig.DAILY_COIN_BASE

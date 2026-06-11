@@ -14,7 +14,7 @@ Build a Roblox cooking game ("Cooking Rush") using a data-driven architecture wh
 | M1 — Station archetypes, 3D interaction, serve a cheeseburger | **Complete** (code + world) |
 | M2 — Full level loop, patience meters, combo, timer, stars | **Complete** |
 | M3 — LevelGenerator → LevelController, unit tests | **Complete** |
-| M4 — DataStore profiles, SubmitLevelResult server validation | Pending |
+| M4 — DataStore profiles, SubmitLevelResult server validation | **Complete** |
 | M5 — ProgressionService, UpgradeService, Shop UI | Pending |
 | M6 — Sushi restaurant (config-only) | Pending |
 
@@ -23,7 +23,7 @@ Build a Roblox cooking game ("Cooking Rush") using a data-driven architecture wh
 ## Architecture Overview
 
 - **Source root**: `C:\Users\19146\cooking-rush\src\`
-- **Sync tool**: Roblox Studio MCP (`execute_luau`) — no Rojo HTTP
+- **Sync tool**: **Rojo live sync** (`rojo serve` + the managed Studio plugin, installed via `rojo plugin install`). Edit files on disk → they sync into Studio automatically. This replaced the earlier `execute_luau` full-`Source` pushes and resolved the disk↔Studio drift (the in-Studio scripts had been hand-condensed copies). Run `rojo serve` from the repo root, then Rojo → Connect in Studio.
 - **Config layer**: `ReplicatedStorage.Shared.Config.{Stations, Recipes, Ingredients, Customers, Upgrades, Restaurants}`
 - **Pure logic**: `ReplicatedStorage.Shared.Modules.{RecipeResolver, EconomyMath, LevelGenerator, Schema}`
 - **Server**: `src/ServerScriptService/Server/init.server.lua` — boots DataService → LevelService → PlayerService

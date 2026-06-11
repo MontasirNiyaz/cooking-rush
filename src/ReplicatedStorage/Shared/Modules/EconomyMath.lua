@@ -91,6 +91,14 @@ function EconomyMath.levelReward(
 	return { coins = coins, gems = gems, xp = xp }
 end
 
+-- ── Daily reward ──────────────────────────────────────────────────────────────
+
+-- True when enough time has elapsed since the last claim to claim again.
+-- Pure so the eligibility rule can be unit-tested without os.time / a profile.
+function EconomyMath.canClaimDaily(lastClaim: number, now: number, intervalSeconds: number): boolean
+	return (now - lastClaim) >= intervalSeconds
+end
+
 -- ── Theoretical max coins (server validation) ─────────────────────────────────
 
 -- Upper-bound estimate: every customer served instantly at max combo.

@@ -13,6 +13,7 @@ local CustomerController = require(Controllers.CustomerController)
 local StationController  = require(Controllers.StationController)
 local LevelController    = require(Controllers.LevelController)
 local UIController       = require(Controllers.UIController)
+local ProfileController  = require(Controllers.ProfileController)
 
 ComboController:init()
 OrderController:init()
@@ -20,6 +21,7 @@ CustomerController:init()
 StationController:init()
 LevelController:init()
 UIController:init()
+ProfileController:init()
 
 print("[Client] Cooking Rush client ready.")
 

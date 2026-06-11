@@ -123,7 +123,7 @@ It prints `[Tests] N passed, M failed` and warns one line per failure. `TestRunn
 | **M1** | Three station archetypes wired to 3D interaction; serve a cheeseburger end-to-end | ✅ Done |
 | **M2** | Full level state machine (Intro → Playing → Results), patience meters, combo, timer, star calc | ✅ Done |
 | **M3** | Wire `LevelGenerator` into `LevelController`; tune the 40-level difficulty curve; run specs | ✅ Done |
-| **M4** | DataStore-backed profiles; server-side `SubmitLevelResult` validation; daily reward | ⏳ Planned |
+| **M4** | DataStore-backed profiles; server-side `SubmitLevelResult` validation; daily reward | ✅ Done |
 | **M5** | Restaurant unlocks; upgrade trees applied as modifiers; Shop / Upgrade UI | ⏳ Planned |
 | **M6** | Add the **Sushi** restaurant as pure config — proving zero engine code changes | ⏳ Planned |
 
