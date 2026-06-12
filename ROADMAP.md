@@ -1,7 +1,11 @@
 # ROADMAP — Cooking Rush P0–P6
 
-Active phase: **P0**. Work top to bottom. Check boxes only when the task's acceptance
+Active phase: **P1**. Work top to bottom. Check boxes only when the task's acceptance
 criteria all pass. Exit criteria gate the next phase.
+
+> P0 complete (2026-06-12): all of P0.1–P0.7 landed, ISSUES #8–#12 / #14–#17 closed
+> (#13 = P1.0). Exit criteria met — security specs green, two-server clobber test
+> passes, real-config suite green (97/97), dev/prod env split verified on a live boot.
 
 ## P0 — Foundation fixes (`tasks/P0.md`) — REVISED per ISSUES.md #8–#17
 - [x] P0.1 Level-session validation: anti-farm + server-computed stars (CRITICAL)
@@ -10,7 +14,7 @@ criteria all pass. Exit criteria gate the next phase.
 - [x] P0.4 Dev/prod DataStore namespacing
 - [x] P0.5 Real-config invariant + snapshot test suite
 - [x] P0.6 Gate Studio auto-start behind DEBUG_AUTOSTART
-- [ ] P0.7 Doc reconciliation (multi-output dispenser = won't-do)
+- [x] P0.7 Doc reconciliation (multi-output dispenser = won't-do)
 - **Exit:** security specs green; two-server clobber test passes; real-config suite green; env split verified.
 
 

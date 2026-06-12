@@ -7,6 +7,19 @@ specified levels. Drop these values straight into the `Config/` modules.
 Conventions: times in **seconds**, prices in **coins**. These are starting balance values —
 all of them live in config so they're tunable without code changes.
 
+> ⚠️ **Superseded by shipped config (ISSUES #17).** This document is a **design
+> reference**, not the source of truth. Where it diverges from the shipped
+> `Shared/Config/` modules — tip multipliers, station tables, the §7 "GOLDEN" level
+> tables — **the shipped config and the `LevelGenerator` output win.** Generator
+> drift is guarded by `tests/RealConfig.spec.lua` + `tests/LevelSnapshots.lua`, not by
+> the numbers printed here. Use this doc for intent; read `Config/` for current values.
+>
+> **Multi-output Dispenser = won't-do (ISSUES #16).** The §2 `outputs: {string}`
+> schema extension below was **not implemented and won't be.** The established pattern
+> is **one Dispenser per item** (see Sushi's ingredient shelves + `green_tea`,
+> `rice_dispenser`); a multi-drink fountain is several Dispenser Parts sharing a model.
+> The `Dispenser` archetype stays single-`produces`.
+
 ---
 
 ## 1. Ingredients (`Ingredients.lua`)
@@ -50,19 +63,18 @@ assembler = {
     id = "assembler", displayName = "Prep Counter", archetype = "Assembler",
     capacity = 3,
 },
-soda_fountain = {
-    id = "soda_fountain", displayName = "Soda Fountain", archetype = "Dispenser",
-    outputs = { "cola", "orange" },   -- see schema note
-    refillTime = 3, maxStock = 4, upgradeTreeId = "soda_capacity",
-},
+-- ❌ NOT the shipped pattern — see the won't-do note below. Use one Dispenser
+-- per drink instead, e.g.:
+cola_dispenser   = { id = "cola_dispenser",   archetype = "Dispenser", produces = "cola",   refillTime = 1, maxStock = 8 },
+orange_dispenser = { id = "orange_dispenser", archetype = "Dispenser", produces = "orange", refillTime = 1, maxStock = 8 },
 ```
 
-> **One deliberate schema extension.** The original `Dispenser` had a single `produces`.
-> Real fast-food soda machines pour multiple drinks, and coffee/dessert machines later will
-> too. Change `produces: string` → `outputs: {string}`, with independent ready-stock per
-> output. This is a ~10-line change to the Dispenser archetype, done **once**, and every
-> future multi-output machine becomes pure data. This is the only engine touch this content
-> requires — exactly the "new mechanic → touch engine minimally" rule from the spec.
+> ~~**One deliberate schema extension.**~~ **WON'T-DO (ISSUES #16).** This proposed
+> changing the `Dispenser` `produces: string` → `outputs: {string}`. It was **not
+> implemented.** The codebase settled on the simpler, already-proven pattern: **one
+> Dispenser per item** (Sushi's shelves, `rice_dispenser`, `tea_dispenser`). A
+> multi-drink fountain is just several Dispenser Parts sharing a visual model — zero
+> engine change, archetype stays trivial. Do not implement `outputs: {string}`.
 
 ---
 
