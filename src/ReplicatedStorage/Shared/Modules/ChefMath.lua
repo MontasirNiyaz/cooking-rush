@@ -65,6 +65,19 @@ function ChefMath.aggregatePassives(
 	return result
 end
 
+-- The idle-production multiplier from a passive bundle: both tip and cook-speed
+-- represent productivity, so an idle restaurant benefits from either. autoServe /
+-- burn-immunity don't apply to idle output.
+function ChefMath.idleMultiplier(passives: Passives): number
+	return passives.tipMult * passives.cookSpeedMult
+end
+
+-- A single chef's standalone idle value, for ranking when auto-assigning.
+function ChefMath.chefIdleValue(chef: OwnedChef, chefList: { [string]: any }, gameConfig: any): number
+	local p = ChefMath.aggregatePassives({ chef }, { chef.uid }, chefList, gameConfig)
+	return ChefMath.idleMultiplier(p)
+end
+
 -- Total prestige across all restaurants (sum of the per-restaurant prestige map).
 function ChefMath.totalPrestige(prestigeMap: { [string]: number }): number
 	local total = 0

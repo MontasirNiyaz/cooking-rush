@@ -80,6 +80,39 @@ The architecture's central claim, validated: the full game loop runs for Sushi w
 
 ---
 
+## 10. M9 — Idle / Passive Empire `[milestone:M9]` — DONE
+
+Owned restaurants accrue offline income; the loop that gives chefs/prestige somewhere to
+compound. Idle yield is derived from existing config — no new per-restaurant authoring.
+
+- [x] Pure `IdleMath.accrue(rate, mult, elapsed, cap)` + `cappedElapsed`/`isCapped`/
+  `capFraction` (13 specs). Server clamps the clock, then calls this.
+- [x] `IdleService` (server-authoritative): per-restaurant accrual from `lastCollect`
+  (repurposed `lastIncomeClaim`), `collect` (one/all) grants via EconomyService + resets the
+  timestamp, output = base (`dailyIncome` × `IDLE_RATE_MULT`) × prestige × assigned-chef
+  passives × avg menu mastery.
+- [x] **Anti-exploit:** `elapsed = os.time() - lastCollect` (server clock only); clamped to
+  `[0, cap]` so a tampered client clock can't mint coins. New restaurants start accruing from
+  first sight, not epoch.
+- [x] Chef assignment: `idleAssignments` profile field; `autoAssign` fills free slots with the
+  best unassigned chefs (`ChefMath.chefIdleValue`), `unassign` for control. Fusion strips
+  consumed chefs from assignments.
+- [x] Offline cap upgrade — gem sink (`purchaseCap`: `IDLE_CAP_UPGRADE_HOURS` per
+  `IDLE_CAP_UPGRADE_GEM_COST` gems, up to `IDLE_CAP_MAX_BONUS_HOURS`).
+- [x] Profile v4 (+ migration `[3]`): `idleAssignments`, `idleCapBonusHours`.
+- [x] `IdleUIController`: live-ticking pending counter, Collect/Collect-All, chef assignment
+  chips, cap upgrade, floating "+N" number-pop.
+
+**Verification (Studio, Rojo-synced):** clean Schema-validated boot; full suite **129/129**
+(+13). End-to-end integration confirmed: 1h accrual = 25; 100h clamped to the 8h cap = 200;
+prestige 2 → ×1.5 = 300; collect grants + resets timestamp (next pending 0); auto-assign 2
+chefs → ×1.2544 = 31; unassign; cap upgrade → 12h for 25 gems.
+
+**Reserved:** a "world map" node UI (vs. the current list panel) is a presentation upgrade;
+the loop itself is complete.
+
+---
+
 ## 9. M8 — Chef Collection & Recruitment `[milestone:M8]` — DONE
 
 The headline collection/gacha system. Chefs are config rows; their passives are effect tags

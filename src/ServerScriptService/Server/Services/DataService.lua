@@ -30,10 +30,13 @@ export type Profile = {
 	equippedChefs: { number },                             -- equipped chef uids
 	pity: { [string]: number },                            -- crateId → consecutive sub-floor pulls
 	nextChefUid: number,                                   -- server-authoritative uid counter
+	-- M9 idle empire (lastIncomeClaim above = per-restaurant idle last-collect timestamp)
+	idleAssignments: { [string]: { number } },             -- restaurantId → assigned chef uids
+	idleCapBonusHours: number,                             -- purchased offline-cap extension
 	version: number,
 }
 
-local CURRENT_VERSION = 3
+local CURRENT_VERSION = 4
 
 local DEFAULT_PROFILE: Profile = {
 	coins = 100, gems = 5, xp = 0, playerLevel = 1,
@@ -42,6 +45,7 @@ local DEFAULT_PROFILE: Profile = {
 	lastDailyClaim = 0, lastIncomeClaim = {},
 	mastery = {}, prestige = {}, prestigeTokens = 0,
 	chefs = {}, equippedChefs = {}, pity = {}, nextChefUid = 1,
+	idleAssignments = {}, idleCapBonusHours = 0,
 	version = CURRENT_VERSION,
 }
 
@@ -59,6 +63,11 @@ local MIGRATIONS: { (Profile) -> () } = {
 		p.equippedChefs = p.equippedChefs or {}
 		p.pity          = p.pity or {}
 		p.nextChefUid   = p.nextChefUid or 1
+	end,
+	-- v3 → v4: add M9 idle-empire fields.
+	[3] = function(p)
+		p.idleAssignments   = p.idleAssignments or {}
+		p.idleCapBonusHours = p.idleCapBonusHours or 0
 	end,
 }
 
@@ -106,6 +115,7 @@ local function load(player: Player): Profile
 		profile.chefs               = {}
 		profile.equippedChefs       = {}
 		profile.pity                = {}
+		profile.idleAssignments     = {}
 	end
 	profiles[player.UserId] = profile
 	return profile

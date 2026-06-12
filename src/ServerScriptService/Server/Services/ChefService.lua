@@ -110,6 +110,14 @@ function ChefService:fuse(player: Player, uid: number): any
 		if not consume[u] then table.insert(keptEquipped, u) end
 	end
 	profile.equippedChefs = keptEquipped
+	-- Also drop consumed chefs from any idle assignment (M9).
+	if profile.idleAssignments then
+		for _, list in pairs(profile.idleAssignments) do
+			for i = #list, 1, -1 do
+				if consume[list[i]] then table.remove(list, i) end
+			end
+		end
+	end
 
 	target.level += 1
 	DataService:save(player)

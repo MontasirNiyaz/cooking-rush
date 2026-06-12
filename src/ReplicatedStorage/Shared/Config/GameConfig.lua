@@ -52,4 +52,14 @@ return {
 	CHEF_FUSION_DUPES       = 3,     -- duplicate chefs consumed per fusion level-up
 	CHEF_MAX_LEVEL          = 10,    -- fusion level cap
 	CHEF_AUTOSERVE_INTERVAL = 6,     -- seconds between autoServe deliveries
+
+	-- Idle / passive empire (M9)
+	-- Base idle rate is derived from a restaurant's `dailyIncome` (coins/day);
+	-- IDLE_RATE_MULT globally scales the whole idle economy without per-restaurant edits.
+	IDLE_RATE_MULT          = 12,    -- global idle tuning knob
+	IDLE_BASE_CAP_HOURS     = 8,     -- offline accrual cap before upgrades
+	IDLE_CAP_UPGRADE_HOURS  = 4,     -- hours added per cap upgrade
+	IDLE_CAP_UPGRADE_GEM_COST = 25,  -- gem cost per cap upgrade (gem sink)
+	IDLE_CAP_MAX_BONUS_HOURS = 16,   -- max purchasable cap extension
+	IDLE_CHEF_SLOTS         = 3,     -- chefs assignable to idle-run each restaurant
 }

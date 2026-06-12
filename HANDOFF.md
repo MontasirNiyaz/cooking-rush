@@ -19,6 +19,7 @@ Build a Roblox cooking game ("Cooking Rush") using a data-driven architecture wh
 | M6 — Sushi restaurant (config-only) | **Complete** |
 | M7 — Meta-progression spine: Recipe Mastery + Restaurant Prestige | **Complete** (code + unit tests + Studio verification) |
 | M8 — Chef Collection & Recruitment (gacha, equip, fusion, passives) | **Complete** (code + 31 new specs + Studio integration verified) |
+| M9 — Idle / Passive Empire (offline accrual, chef assignment, gem cap) | **Complete** (code + 13 new specs + Studio integration verified) |
 
 ---
 
@@ -100,6 +101,9 @@ function Station:interact(heldItemId: string?): (string?, boolean)
 | `src/ServerScriptService/Server/Services/ChefService.lua` | Equip/unequip/fuse; equip-slot cap from total prestige |
 | `src/StarterPlayer/.../Controllers/ChefController.lua` | Aggregates equipped passives at level start; drives autoServe |
 | `src/StarterPlayer/.../Controllers/ChefUIController.lua` | Chefs panel: recruit (published odds), collection, equip, fuse |
+| `src/ReplicatedStorage/Shared/Modules/IdleMath.lua` | Pure offline accrual + cap (server clamps the clock, then calls this) |
+| `src/ServerScriptService/Server/Services/IdleService.lua` | Idle accrual/collect, chef assignment, gem cap upgrade (server-authoritative) |
+| `src/StarterPlayer/.../Controllers/IdleUIController.lua` | Idle panel: live-ticking pending, Collect, assign chefs, cap upgrade, number-pop |
 
 ---
 
@@ -180,13 +184,48 @@ existing saves.
 - `autoServe` delivers via the existing serve path; a bespoke "chef walks the dish over"
   animation is also model-dependent and deferred.
 
-## Next Steps (M9 — Idle / Passive Empire)
-Convert owned-but-idle restaurants into offline income. Assign equipped/benched chefs to
-auto-run a restaurant; output scales with chef passives + prestige + mastery. Build a pure
-`IdleMath.accrue(state, elapsed) -> earnings` (unit-tested), an `IdleService` that computes
-accrued earnings from a `lastCollect` timestamp on join (capped by an offline-cap that
-upgrades extend), a "Collect" UI on the world map, and server-side `elapsed` clamping
-against real timestamp deltas (never trust the client clock). See the M7–M12 roadmap.
+## M9 — Idle / Passive Empire
+
+Turns owned-but-idle restaurants into an offline income engine — the loop that gives chefs
+and prestige somewhere to compound. Idle yield is **derived from existing config** (no new
+per-restaurant authoring): each unlocked restaurant accrues at a base rate from its
+`dailyIncome`, scaled by prestige × assigned-chef passives × average menu mastery.
+
+### Server owns the clock (anti-exploit)
+`IdleService` computes `elapsed = os.time() - lastCollect` per restaurant — the client never
+supplies a delta. `IdleMath.accrue` clamps `elapsed` to `[0, capSeconds]` (so a wound-back
+client clock yields 0, and a far-past one is capped). Collect grants via `EconomyService`
+and resets `lastCollect` to `os.time()`. A restaurant's timestamp is initialised to "now" on
+first sight so a freshly-unlocked one doesn't read as instantly capped.
+
+### Pieces
+- Pure `IdleMath`: `accrue`, `cappedElapsed`, `isCapped`, `capFraction` (13 specs).
+- Profile **v4**: repurposed the pre-existing `lastIncomeClaim` as the per-restaurant idle
+  last-collect timestamp; added `idleAssignments` ({restaurantId → uids}) and
+  `idleCapBonusHours`. Migration `[3]`. Fusion now also strips consumed chefs from idle
+  assignments.
+- `IdleService`: `getState` (UI snapshot), `collect` (one or all), `autoAssign` (fills free
+  idle slots with the best unassigned chefs by `ChefMath.chefIdleValue`), `unassign`,
+  `purchaseCap` (gem sink, `IDLE_CAP_UPGRADE_GEM_COST` per `IDLE_CAP_UPGRADE_HOURS`).
+- `IdleUIController`: live-ticking pending counter (projected client-side between fetches,
+  reconciled on collect), Collect/Collect-All, per-restaurant chef assignment chips, cap
+  upgrade, and a floating "+N" number-pop.
+- All idle tuning is in `GameConfig` (`IDLE_RATE_MULT`, cap hours, gem cost, chef slots).
+
+### Reserved / tuning notes
+- Base rate reads `dailyIncome` as a *daily* figure scaled by `IDLE_RATE_MULT` (=12) — a
+  single global knob to balance the idle economy without touching restaurant configs.
+- A "world map" with restaurant nodes (vs. the current list panel) is a presentation
+  upgrade for later; the loop itself is complete.
+
+## Next Steps (M10 — Live-Ops: Events, Seasons, Quests, Leaderboards)
+The recurring re-engagement layer, nearly free thanks to the data-driven engine. Build:
+limited-time restaurants via an optional `availability = { startUtc, endUtc }` + event
+currency on the `Restaurant` schema (a holiday restaurant = one config file that
+auto-appears/expires); `QuestService` with a `Quests.lua` daily-objective generator + login
+streaks; a `Seasons.lua` battle pass (free + premium track); and an OrderedDataStore-backed
+`LeaderboardService`. Goal: shipping a seasonal event should need **zero new Luau logic** —
+the M6 config-only test, extended. See the M7–M12 roadmap.
 
 ### Full cheeseburger serve flow (reference for testing)
 

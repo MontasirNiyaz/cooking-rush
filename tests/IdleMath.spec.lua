@@ -1,0 +1,61 @@
+--!strict
+-- TestEZ spec for IdleMath (offline accrual + cap).
+
+return function()
+	local IdleMath = require(game.ReplicatedStorage.Shared.Modules.IdleMath)
+
+	describe("cappedElapsed", function()
+		it("passes through elapsed below the cap", function()
+			expect(IdleMath.cappedElapsed(50, 100)).to.equal(50)
+		end)
+		it("clamps to the cap", function()
+			expect(IdleMath.cappedElapsed(500, 100)).to.equal(100)
+		end)
+		it("never goes negative (client clock skew)", function()
+			expect(IdleMath.cappedElapsed(-30, 100)).to.equal(0)
+		end)
+	end)
+
+	describe("accrue", function()
+		it("multiplies rate × multiplier × elapsed", function()
+			-- 2/s × 3 × 10s = 60
+			expect(IdleMath.accrue(2, 3, 10, 100)).to.equal(60)
+		end)
+		it("caps the elapsed time", function()
+			-- elapsed 200 but cap 100 → 2 × 3 × 100 = 600
+			expect(IdleMath.accrue(2, 3, 200, 100)).to.equal(600)
+		end)
+		it("floors fractional coins", function()
+			-- 1 × 1 × 10.0 with rate 0.55 → 5.5 → 5
+			expect(IdleMath.accrue(0.55, 1, 10, 100)).to.equal(5)
+		end)
+		it("is zero for negative elapsed", function()
+			expect(IdleMath.accrue(2, 3, -5, 100)).to.equal(0)
+		end)
+		it("is zero at a zero multiplier", function()
+			expect(IdleMath.accrue(2, 0, 10, 100)).to.equal(0)
+		end)
+	end)
+
+	describe("isCapped", function()
+		it("is false below the cap", function()
+			expect(IdleMath.isCapped(50, 100)).to.equal(false)
+		end)
+		it("is true at or past the cap", function()
+			expect(IdleMath.isCapped(100, 100)).to.equal(true)
+			expect(IdleMath.isCapped(150, 100)).to.equal(true)
+		end)
+	end)
+
+	describe("capFraction", function()
+		it("is the filled fraction below the cap", function()
+			expect(IdleMath.capFraction(25, 100)).to.equal(0.25)
+		end)
+		it("clamps to 1 at/over the cap", function()
+			expect(IdleMath.capFraction(200, 100)).to.equal(1)
+		end)
+		it("is 1 for a non-positive cap", function()
+			expect(IdleMath.capFraction(10, 0)).to.equal(1)
+		end)
+	end)
+end

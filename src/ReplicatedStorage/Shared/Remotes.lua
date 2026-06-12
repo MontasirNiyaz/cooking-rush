@@ -41,6 +41,13 @@ local Remotes = {
 	UnequipChef          = makeRemote("RemoteFunction", "UnequipChef"),
 	-- Client → Server: fuse duplicate chefs to level up one
 	FuseChef             = makeRemote("RemoteFunction", "FuseChef"),
+	-- Client → Server: idle empire — per-restaurant accrual state, collect, chef
+	-- assignment, and offline-cap upgrade (all server-authoritative on the clock)
+	GetIdleState         = makeRemote("RemoteFunction", "GetIdleState"),
+	CollectIdle          = makeRemote("RemoteFunction", "CollectIdle"),
+	AutoAssignIdle       = makeRemote("RemoteFunction", "AutoAssignIdle"),
+	UnassignChefIdle     = makeRemote("RemoteFunction", "UnassignChefIdle"),
+	PurchaseIdleCap      = makeRemote("RemoteFunction", "PurchaseIdleCap"),
 	-- Client → Server: fetch own profile for UI
 	GetProfile           = makeRemote("RemoteFunction", "GetProfile"),
 }

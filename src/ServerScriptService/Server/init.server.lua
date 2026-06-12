@@ -19,6 +19,7 @@ local UpgradeService     = require(Services.UpgradeService)
 local MasteryService     = require(Services.MasteryService)
 local RecruitService     = require(Services.RecruitService)
 local ChefService        = require(Services.ChefService)
+local IdleService        = require(Services.IdleService)
 local LevelService       = require(Services.LevelService)
 
 -- Init order respects dependency graph.
@@ -29,6 +30,7 @@ UpgradeService:init()
 MasteryService:init()
 RecruitService:init()
 ChefService:init()
+IdleService:init()
 LevelService:init()
 
 print("[Server] Cooking Rush server ready.")

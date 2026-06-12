@@ -64,6 +64,7 @@ cooking-rush/
 │   │   │   ├── EconomyMath.lua      # serve value, combos, stars, mastery & prestige math
 │   │   │   ├── GachaMath.lua        # weighted drop rolling + pity (M8)
 │   │   │   ├── ChefMath.lua         # chef passive aggregation, equip slots, fusion (M8)
+│   │   │   ├── IdleMath.lua         # offline accrual + cap (M9)
 │   │   │   ├── LevelGenerator.lua   # procedurally builds a restaurant's levels
 │   │   │   ├── Schema.lua           # validates all config on boot
 │   │   │   └── Enums.lua
@@ -72,7 +73,8 @@ cooking-rush/
 │   ├── ServerScriptService/Server/
 │   │   ├── init.server.lua
 │   │   └── Services/             # DataService, EconomyService, LevelService, ProgressionService,
-│   │                             # UpgradeService, MasteryService, RecruitService, ChefService
+│   │                             # UpgradeService, MasteryService, RecruitService,
+│   │                             # ChefService, IdleService
 │   └── StarterPlayer/StarterPlayerScripts/Client/
 │       ├── init.client.lua
 │       ├── Controllers/          # Level, Station, Customer, Order, Combo, UI
@@ -113,7 +115,7 @@ When running inside Studio, the client auto-starts FastFood level 1 after a shor
 
 ## Testing
 
-Unit specs live in `tests/` (TestEZ format) and cover the pure-logic modules — `RecipeResolver`, `EconomyMath` (including the M7 mastery & prestige math), `LevelGenerator`, `UpgradeMath`, and the M8 `GachaMath` (weighted rolling + pity) and `ChefMath` (passive aggregation, equip slots, fusion) — which contain all the rules and no Roblox side effects, so they're cheap to test in isolation. Current suite: **116/116 passing**.
+Unit specs live in `tests/` (TestEZ format) and cover the pure-logic modules — `RecipeResolver`, `EconomyMath` (including the M7 mastery & prestige math), `LevelGenerator`, `UpgradeMath`, the M8 `GachaMath` (weighted rolling + pity) and `ChefMath` (passive aggregation, equip slots, fusion), and the M9 `IdleMath` (offline accrual + cap) — which contain all the rules and no Roblox side effects, so they're cheap to test in isolation. Current suite: **129/129 passing**.
 
 The specs are synced to `ServerStorage.Tests` alongside a small **`TestRunner`** module. To run the whole suite inside Studio, enter Play mode and execute (command bar set to *Server*, or via the MCP `execute_luau`):
 
@@ -138,7 +140,8 @@ It prints `[Tests] N passed, M failed` and warns one line per failure. `TestRunn
 | **M6** | Add the **Sushi** restaurant as pure config — proving zero engine code changes | ✅ Done |
 | **M7** | Meta-progression spine: **Recipe Mastery** (per-dish grind ladder) + **Restaurant Prestige** (franchise-for-multiplier loop, Prestige Tokens) | ✅ Done |
 | **M8** | **Chef Collection & Recruitment** — rarity-tiered collectible chefs, server-authoritative gacha with pity, equip/fusion, passive effect-tags consumed by the existing engine | ✅ Done |
+| **M9** | **Idle / Passive Empire** — unlocked restaurants accrue offline income (base × prestige × assigned-chef passives × mastery), capped by a gem-upgradable offline cap; server-authoritative clock | ✅ Done |
 
-M7–M8 layer the incremental-growth meta over the M0–M6 single-restaurant loop. The systems are formula + config: no new content is authored, they multiply the value of every restaurant the generator already produces. **Chefs** are the collection hook — a 200-chef roster is just rows in `Chefs.lua`; their passives (`cookSpeedMult`, `tipMult`, `burnImmuneChance`, `autoServe`) are effect tags the existing stations/economy already consume. See the [`COOKING_GAME_SPEC` M7–M12 roadmap](HANDOFF.md) for what's next (M9 idle, M10 live-ops, M11 trading, M12 monetization).
+M7–M9 layer the incremental-growth meta over the M0–M6 single-restaurant loop. The systems are formula + config: no new content is authored, they multiply the value of every restaurant the generator already produces. **Chefs** are the collection hook — a 200-chef roster is just rows in `Chefs.lua`; their passives (`cookSpeedMult`, `tipMult`, `burnImmuneChance`, `autoServe`) are effect tags the existing stations/economy already consume. **Idle** turns owned restaurants into an offline income engine that gives chefs/prestige somewhere to compound. See the [`COOKING_GAME_SPEC` M7–M12 roadmap](HANDOFF.md) for what's next (M10 live-ops, M11 trading, M12 monetization).
 
 See [`HANDOFF.md`](HANDOFF.md) for detailed architecture notes, design decisions, and the per-milestone implementation plan.
