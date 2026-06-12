@@ -86,3 +86,109 @@ The specs in `tests/` use bare `describe`/`it`/`expect` globals that TestEZ inje
 
 - [x] Added `tests/TestRunner.lua` (synced to `ServerStorage.Tests.TestRunner`) — a minimal TestEZ-compatible runner (`describe`/`it`/`expect(x).to.equal(y)`/`.to.be.ok()`) that `setfenv`-injects the DSL and runs every sibling `*.spec` module. `runAll()` reports pass/fail. Current suite: 63/63 pass.
 - [x] Documented `run tests` steps in the README (Testing section).
+
+---
+---
+
+# P0 Evaluation — June 2026 (pre-P0–P6 run)
+
+Code review of `main` @ c18f9cd against the P0–P6 plan. Issues 8–15 below are new;
+they re-scope phase P0. File as GitHub issues 1:1.
+
+---
+
+## 8. CRITICAL — `SubmitLevelResult` has no session tracking: coin-farming exploit `[security] [P0]`
+
+`Services/LevelService.lua` validates `coinsEarned <= theoreticalMax * tolerance` but:
+- never verifies the player **started** the level (no active-session record),
+- never limits **how many times** a result can be submitted,
+- receives `timeTaken` in the payload (line 44 comment) and **never reads it**.
+
+A client can loop `SubmitLevelResult` with near-max coins and farm currency/XP without playing.
+
+- [ ] `RequestLevelStart` records `activeSession[player] = { restaurantId, levelIndex, startedClock = os.clock() }`
+- [ ] `SubmitLevelResult` rejects unless payload matches the active session; consume the session on accept (one submit per start)
+- [ ] Validate elapsed: `os.clock() - startedClock >= minPlausibleSeconds(level)` (e.g. last spawn `atSecond` × a config factor, `GameConfig.MIN_RESULT_TIME_FACTOR`)
+- [ ] Clear session on PlayerRemoving
+- [ ] Unit-test the pure plausibility function
+
+## 9. Server trusts client star count — recompute instead `[security] [P0]`
+
+`LevelService` clamps `payload.stars` but the server already has `coinsEarned` and the
+re-generated `level.goals`. Clamping still lets a client claim 3 stars on 1-star coins,
+inflating `levelReward` and first-clear gems.
+
+- [ ] Replace the clamp with `stars = EconomyMath.starsFor(coinsEarned, level.goals)`; ignore `payload.stars` entirely (keep it only for telemetry mismatch logging)
+
+## 10. No rate limiting on the remote surface `[security] [P0]`
+
+No throttle on any RemoteFunction (`grep -rni ratelimit src/ServerScriptService` → empty).
+`RequestLevelStart` regenerates a level per call (CPU); all invokes are spammable.
+
+- [ ] Add a small per-player token-bucket guard module used by every `OnServerInvoke` (limits in `GameConfig.REMOTE_RATE_LIMITS`)
+- [ ] Log + drop on breach
+
+## 11. Cross-server profile session locking `[data-integrity] [P0]`
+
+Known gap (issue #4 "Remaining"). `save()` runs `UpdateAsync` but the transform ignores
+the stored value, so a stale server can overwrite newer data if a player hops servers.
+Must land before soft launch (P4) traffic.
+
+- [ ] Lock token in the profile (`sessionLock = { jobId, expiresAt }`) acquired via `UpdateAsync` compare on load; refuse/steal-after-expiry semantics
+- [ ] `save()` transform verifies our lock before writing; release on leave/BindToClose
+- [ ] Pure-test the lock state machine (acquire / steal / expire)
+
+## 12. Dev/prod DataStore namespacing `[infra] [P0]`
+
+Single store `"CookingRushV1"` for all environments. Studio/dev testing writes
+production keys once API access is on.
+
+- [ ] `GameConfig.PLACE_ENV` map (placeId → "dev"/"prod"); store name = `env .. "_" .. base`
+- [ ] Boot log line stating environment; pure-test the mapping
+
+## 13. Streaming-safe station/seat binding (P1 prerequisite) `[P1-prereq]`
+
+README mandates `Workspace.StreamingEnabled = false` because `StationController` /
+`CustomerController` snapshot `Workspace.Stations:GetChildren()` at startup. The P1 hub
+world + mobile perf budget require StreamingEnabled **on**.
+
+- [ ] Tag station/seat Parts with CollectionService tags (`Station`, `Seat`) + keep the `StationId` attribute
+- [ ] Controllers bind via `GetTagged` + `GetInstanceAddedSignal/RemovedSignal` (streaming-safe, also removes the fixed-folder-name coupling)
+- [ ] Flip `StreamingEnabled = true`; update README/HANDOFF
+- [ ] Extend `tools/build_sushi_world.lua` pattern into a generic config-driven `tools/build_world.lua` that applies tags (world layout stays version-controlled)
+
+## 14. Generator/economy tests never exercise real configs `[testing] [P0]`
+
+All 63 specs run against mock configs. Nothing asserts that the *shipped* FastFood/Sushi
+configs generate valid, balanced levels. (Supersedes the old "golden levels" idea from
+`docs/FASTFOOD_CONTENT_AND_LEVELS.md` §7 — those tables are design references only.)
+
+- [ ] Real-config invariant suite: for every restaurant × all `levelCount` indices —
+      every ordered recipe is in the restaurant menu and producible by its stations;
+      goals strictly ordered; customer types valid; spawn times sorted
+- [ ] Snapshot suite: pin generated levels {1, 10, 25, 40} per restaurant (serialize →
+      commit → assert); determinism spec already exists, this adds drift detection
+- [ ] Difficulty monotonicity: customerCount non-decreasing, patienceScale non-increasing across indices
+
+## 15. Close out the Studio auto-start hack (existing issue #1) `[tech-debt] [P0]`
+
+Still live in `init.client.lua:31-37`.
+
+- [ ] `GameConfig.DEBUG_AUTOSTART = false` gate; document in HANDOFF
+
+## 16. Dispenser multi-output — CLOSE as won't-do `[decision]`
+
+`docs/FASTFOOD_CONTENT_AND_LEVELS.md` §2 proposed `produces → outputs: {string}`. The
+codebase established a better pattern: **one Dispenser per item** (see Sushi's shelves +
+`green_tea`). Multi-drink fountains = multiple station Parts sharing a model. No engine
+change; keeps the archetype trivial.
+
+- [ ] Update the content doc + bundle task P0.2 to reflect the decision (done in bundle)
+
+## 17. Doc/config balance divergence — config is truth `[docs]`
+
+`GameConfig` tips (1.5/1.0/0.5 global) and shelf-style dispensers diverge from the
+content doc's per-customer `tipCurve` and station tables. The shipped config is the
+source of truth; the doc is a design reference.
+
+- [ ] Add a "superseded by shipped config" banner to `docs/FASTFOOD_CONTENT_AND_LEVELS.md`
