@@ -8,6 +8,7 @@ local Players           = game:GetService("Players")
 local DataService        = require(script.Parent.DataService)
 local EconomyService     = require(script.Parent.EconomyService)
 local ProgressionService = require(script.Parent.ProgressionService)
+local RemoteGuard        = require(script.Parent.RemoteGuard)
 local Remotes            = require(ReplicatedStorage.Shared.Remotes)
 local Restaurants        = require(ReplicatedStorage.Shared.Config.Restaurants)
 local Recipes            = require(ReplicatedStorage.Shared.Config.Recipes)
@@ -34,6 +35,8 @@ function LevelService:init()
 		restaurantId: string,
 		levelIndex: number
 	)
+		if not RemoteGuard.allow(player, "RequestLevelStart") then return nil end
+
 		local profile = DataService:getProfile(player)
 		if not profile then return nil end
 
@@ -62,6 +65,7 @@ function LevelService:init()
 	-- ── SubmitLevelResult ──────────────────────────────────────────────────────
 	-- payload = { restaurantId, levelIndex, coinsEarned, stars, timeTaken }
 	Remotes.SubmitLevelResult.OnServerInvoke = function(player: Player, payload: any)
+		if not RemoteGuard.allow(player, "SubmitLevelResult") then return { ok = false, reason = "rate_limited" } end
 		if type(payload) ~= "table" then return { ok = false, reason = "bad_payload" } end
 
 		local restaurantId: string  = payload.restaurantId
@@ -140,6 +144,7 @@ function LevelService:init()
 
 	-- ── GetProfile ─────────────────────────────────────────────────────────────
 	Remotes.GetProfile.OnServerInvoke = function(player: Player)
+		if not RemoteGuard.allow(player, "GetProfile") then return nil end
 		return DataService:getProfile(player)
 	end
 

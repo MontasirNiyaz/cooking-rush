@@ -44,6 +44,18 @@ return {
 	-- been served. Min elapsed = last spawn's atSecond × this factor (anti-instant-submit).
 	MIN_RESULT_TIME_FACTOR  = 0.5,
 
+	-- Per-player remote rate limits (token bucket): burst = bucket capacity,
+	-- refillPerSecond = sustained rate. __default covers any unlisted remote.
+	REMOTE_RATE_LIMITS = {
+		RequestLevelStart = { burst = 6,  refillPerSecond = 1 },
+		SubmitLevelResult = { burst = 6,  refillPerSecond = 0.5 },
+		PurchaseUpgrade   = { burst = 10, refillPerSecond = 2 },
+		UnlockRestaurant  = { burst = 6,  refillPerSecond = 1 },
+		ClaimDaily        = { burst = 3,  refillPerSecond = 0.05 },
+		GetProfile        = { burst = 12, refillPerSecond = 3 },
+		__default         = { burst = 10, refillPerSecond = 5 },
+	},
+
 	-- Daily reward
 	DAILY_COIN_BASE         = 50,
 	DAILY_INTERVAL_SECONDS  = 86400,

@@ -5,7 +5,7 @@ criteria all pass. Exit criteria gate the next phase.
 
 ## P0 — Foundation fixes (`tasks/P0.md`) — REVISED per ISSUES.md #8–#17
 - [x] P0.1 Level-session validation: anti-farm + server-computed stars (CRITICAL)
-- [ ] P0.2 Remote rate limiting
+- [x] P0.2 Remote rate limiting
 - [ ] P0.3 Profile session locking
 - [ ] P0.4 Dev/prod DataStore namespacing
 - [ ] P0.5 Real-config invariant + snapshot test suite

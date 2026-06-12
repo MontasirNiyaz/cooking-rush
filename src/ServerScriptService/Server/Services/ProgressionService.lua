@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DataService    = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
+local RemoteGuard    = require(script.Parent.RemoteGuard)
 local Remotes        = require(ReplicatedStorage.Shared.Remotes)
 local Restaurants    = require(ReplicatedStorage.Shared.Config.Restaurants)
 
@@ -62,6 +63,7 @@ end
 
 function ProgressionService:init()
 	Remotes.UnlockRestaurant.OnServerInvoke = function(player: Player, restaurantId: string)
+		if not RemoteGuard.allow(player, "UnlockRestaurant") then return { ok = false, reason = "rate_limited" } end
 		local ok, reason = ProgressionService:canUnlockRestaurant(player, restaurantId)
 		if not ok then return { ok = false, reason = reason } end
 		local config  = Restaurants[restaurantId]

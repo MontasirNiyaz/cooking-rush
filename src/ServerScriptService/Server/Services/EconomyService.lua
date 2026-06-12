@@ -6,6 +6,7 @@ local Players           = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DataService = require(script.Parent.DataService)
+local RemoteGuard = require(script.Parent.RemoteGuard)
 local Remotes     = require(ReplicatedStorage.Shared.Remotes)
 local GameConfig  = require(ReplicatedStorage.Shared.Config.GameConfig)
 local EconomyMath = require(ReplicatedStorage.Shared.Modules.EconomyMath)
@@ -55,6 +56,7 @@ end
 
 function EconomyService:init()
 	Remotes.ClaimDaily.OnServerInvoke = function(player: Player)
+		if not RemoteGuard.allow(player, "ClaimDaily") then return { ok = false, reason = "rate_limited" } end
 		return EconomyService:claimDaily(player)
 	end
 end

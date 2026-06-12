@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DataService    = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
+local RemoteGuard    = require(script.Parent.RemoteGuard)
 local Remotes        = require(ReplicatedStorage.Shared.Remotes)
 local Upgrades       = require(ReplicatedStorage.Shared.Config.Upgrades)
 local Stations       = require(ReplicatedStorage.Shared.Config.Stations)
@@ -44,6 +45,7 @@ end
 
 function UpgradeService:init()
 	Remotes.PurchaseUpgrade.OnServerInvoke = function(player: Player, stationId: string)
+		if not RemoteGuard.allow(player, "PurchaseUpgrade") then return { ok = false, reason = "rate_limited" } end
 		return UpgradeService:purchaseUpgrade(player, stationId)
 	end
 end
