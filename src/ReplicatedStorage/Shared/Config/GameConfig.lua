@@ -40,6 +40,9 @@ return {
 
 	-- Server validation
 	COIN_OVERAGE_TOLERANCE  = 1.15,  -- allow 15% over theoretical max (rounding, combo variance)
+	-- A legit result can't arrive before the level's last customer has plausibly
+	-- been served. Min elapsed = last spawn's atSecond × this factor (anti-instant-submit).
+	MIN_RESULT_TIME_FACTOR  = 0.5,
 
 	-- Daily reward
 	DAILY_COIN_BASE         = 50,

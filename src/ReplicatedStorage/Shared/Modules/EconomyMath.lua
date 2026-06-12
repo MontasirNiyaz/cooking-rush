@@ -124,4 +124,16 @@ function EconomyMath.theoreticalMax(
 	return total
 end
 
+-- ── Minimum plausible completion time (anti-instant-submit) ───────────────────
+
+-- The earliest a legitimate result could be submitted: the last customer can't be
+-- served before they arrive, so the floor is the last spawn's atSecond scaled by a
+-- tolerance factor (< 1 leaves headroom for fast play / clock skew). Pure so the
+-- rule is unit-tested without os.clock or a live session.
+function EconomyMath.minPlausibleSeconds(level: any, factor: number): number
+	local spawns = level.spawns
+	if not spawns or #spawns == 0 then return 0 end
+	return spawns[#spawns].atSecond * factor
+end
+
 return EconomyMath
