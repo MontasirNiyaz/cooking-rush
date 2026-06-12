@@ -3,13 +3,16 @@
 -- All other services read/write through getProfile() — never touch DataStore directly.
 -- Durability: at most one in-flight save per player, retry-with-backoff on failure,
 -- and a BindToClose flush so the final session state is persisted on shutdown.
--- (Full cross-server session locking is future work — see ISSUES.md.)
+-- Cross-server safety: a session lock (SessionLock) is acquired inside the load
+-- UpdateAsync and re-verified on every save, so a stale server can't clobber a
+-- player who has hopped to a newer one.
 
 local DataStoreService = game:GetService("DataStoreService")
 local Players          = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local GameConfig = require(ReplicatedStorage.Shared.Config.GameConfig)
+local GameConfig  = require(ReplicatedStorage.Shared.Config.GameConfig)
+local SessionLock = require(ReplicatedStorage.Shared.Modules.SessionLock)
 
 export type Profile = {
 	coins: number,
@@ -22,6 +25,7 @@ export type Profile = {
 	lastDailyClaim: number,
 	lastIncomeClaim: { [string]: number },
 	version: number,
+	sessionLock: SessionLock.Lock?,  -- server-only; set inside load/save transforms
 }
 
 local CURRENT_VERSION = 1
@@ -63,43 +67,101 @@ local function migrate(p: Profile)
 	end
 end
 
-local function load(player: Player): Profile
-	local key = "player_" .. player.UserId
-	local ok, data = pcall(store.GetAsync, store, key)
-	local profile: Profile
-	if ok and type(data) == "table" then
-		profile = data :: any
-		reconcile(profile, DEFAULT_PROFILE)
-		migrate(profile)
-	else
-		profile = table.clone(DEFAULT_PROFILE :: any)
-		-- Deep-clone table fields
-		profile.unlockedRestaurants = table.clone(DEFAULT_PROFILE.unlockedRestaurants)
-		profile.levelStars          = {}
-		profile.upgrades            = {}
-		profile.lastIncomeClaim     = {}
+local function freshProfile(): Profile
+	local p = table.clone(DEFAULT_PROFILE :: any)
+	-- Deep-clone table fields so sessions don't share the default's sub-tables.
+	p.unlockedRestaurants = table.clone(DEFAULT_PROFILE.unlockedRestaurants)
+	p.levelStars          = {}
+	p.upgrades            = {}
+	p.lastIncomeClaim     = {}
+	return p
+end
+
+-- Atomically acquires the session lock and loads (or initialises) the profile.
+-- Returns nil when another server holds a live lock (the player is kicked to retry).
+local function load(player: Player): Profile?
+	local key   = "player_" .. player.UserId
+	local jobId = game.JobId
+	local now   = os.time()
+	local ttl   = GameConfig.SESSION_LOCK_TTL
+
+	local acquired = false
+	local loaded: Profile? = nil
+
+	local ok, err = pcall(function()
+		store:UpdateAsync(key, function(old: any)
+			-- Refuse if another server holds a live (unexpired) lock.
+			if type(old) == "table" and not SessionLock.canAcquire(old.sessionLock, jobId, now) then
+				acquired = false
+				return nil  -- cancel write; leave their data + lock untouched
+			end
+
+			local data: Profile
+			if type(old) == "table" then
+				data = old :: any
+				reconcile(data, DEFAULT_PROFILE)
+				migrate(data)
+			else
+				data = freshProfile()
+			end
+			data.sessionLock = SessionLock.make(jobId, now, ttl)
+			acquired = true
+			loaded   = data
+			return data
+		end)
+	end)
+
+	if ok and acquired and loaded then
+		profiles[player.UserId] = loaded
+		return loaded
 	end
+
+	if ok and not acquired then
+		-- Foreign live lock: the session is still active on another server.
+		warn(string.format("[DataService] %s is locked on another server — kicking to retry", player.Name))
+		player:Kick("Your save is still active on another server. Please rejoin in a few seconds.")
+		return nil
+	end
+
+	-- DataStore unavailable (e.g. Studio without API access): fall back to an
+	-- in-memory default so the game stays playable locally (no persistence, no lock).
+	warn(string.format("[DataService] load failed for %s (%s) — using in-memory default",
+		player.Name, tostring(err)))
+	local profile = freshProfile()
 	profiles[player.UserId] = profile
 	return profile
 end
 
-local function save(player: Player)
+-- `release` (on leave/shutdown) clears the lock so another server can take over
+-- immediately; otherwise the lock is refreshed to keep this session's claim alive.
+local function save(player: Player, release: boolean?)
 	local userId = player.UserId
 	local p = profiles[userId]
 	if not p then return end
 	if saving[userId] then return end  -- a save is already in flight for this player
 	saving[userId] = true
 
-	local key = "player_" .. userId
+	local key   = "player_" .. userId
+	local jobId = game.JobId
 	for attempt = 1, SAVE_RETRIES do
-		-- UpdateAsync is atomic and queues per key; the transform ignores the old
-		-- value because the in-memory profile is authoritative for this session.
+		local aborted = false
+		-- UpdateAsync is atomic and queues per key. The transform re-checks the
+		-- lock so a stale server can't overwrite a session that moved on.
 		local ok, err = pcall(function()
-			store:UpdateAsync(key, function()
+			store:UpdateAsync(key, function(old: any)
+				local now = os.time()
+				if type(old) == "table" and not SessionLock.canAcquire(old.sessionLock, jobId, now) then
+					aborted = true
+					return nil  -- a newer server owns this profile; don't clobber it
+				end
+				p.sessionLock = if release then nil else SessionLock.make(jobId, now, GameConfig.SESSION_LOCK_TTL)
 				return p
 			end)
 		end)
 		if ok then
+			if aborted then
+				warn(string.format("[DataService] save for %s aborted — lock held by another server", player.Name))
+			end
 			saving[userId] = false
 			return
 		end
@@ -115,7 +177,7 @@ end
 function DataService:init()
 	Players.PlayerAdded:Connect(load)
 	Players.PlayerRemoving:Connect(function(player)
-		save(player)
+		save(player, true)  -- final save + release the lock
 		profiles[player.UserId] = nil
 	end)
 
@@ -141,7 +203,7 @@ function DataService:init()
 		for _, player in ipairs(Players:GetPlayers()) do
 			pending += 1
 			task.spawn(function()
-				save(player)
+				save(player, true)  -- release on shutdown so the next server loads cleanly
 				pending -= 1
 			end)
 		end

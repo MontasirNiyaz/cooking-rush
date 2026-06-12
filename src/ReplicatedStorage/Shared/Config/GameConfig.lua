@@ -37,6 +37,10 @@ return {
 	-- DataStore
 	DATASTORE_NAME          = "CookingRushV1",
 	AUTOSAVE_INTERVAL       = 60,    -- seconds
+	-- Cross-server session lock: how long a lock stays valid without a refresh.
+	-- Must comfortably exceed AUTOSAVE_INTERVAL (every save refreshes it); a
+	-- crashed server's lock auto-expires after this so the player can rejoin.
+	SESSION_LOCK_TTL        = 600,   -- seconds (10 min)
 
 	-- Server validation
 	COIN_OVERAGE_TOLERANCE  = 1.15,  -- allow 15% over theoretical max (rounding, combo variance)
