@@ -114,6 +114,20 @@ local function applyUpgradeLevels()
 	end
 end
 
+-- Apply equipped-chef cook passives to every cooker. cookSpeedMult speeds cooking;
+-- burnImmuneChance gives finished dishes a chance to survive a burn. Read from the
+-- ChefController aggregate (computed at Intro from the player's equipped chefs).
+local function applyChefModifiers()
+	local ChefController = require(script.Parent.ChefController)
+	ChefController:refresh()  -- ensure the aggregate reflects the latest profile, order-independent
+	local p = ChefController:getPassives()
+	for _, station in pairs(_stations) do
+		if station.archetype == "Cooker" then
+			station:setChefModifiers(p.cookSpeedMult, p.burnImmuneChance)
+		end
+	end
+end
+
 function StationController:init()
 	local LevelController = require(script.Parent.LevelController)
 
@@ -131,8 +145,10 @@ function StationController:init()
 				pr.ActionText = promptLabel(sid, nil)
 			end
 		elseif newState == "Intro" then
-			-- Level beginning: apply the player's upgrades to live station behaviour.
+			-- Level beginning: apply the player's upgrades + equipped-chef passives
+			-- to live station behaviour.
 			applyUpgradeLevels()
+			applyChefModifiers()
 		end
 	end)
 

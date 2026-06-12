@@ -14,8 +14,10 @@ local Recipes            = require(ReplicatedStorage.Shared.Config.Recipes)
 local Customers          = require(ReplicatedStorage.Shared.Config.Customers)
 local GameConfig         = require(ReplicatedStorage.Shared.Config.GameConfig)
 local Prestige           = require(ReplicatedStorage.Shared.Config.Prestige)
+local Chefs              = require(ReplicatedStorage.Shared.Config.Chefs)
 local LevelGenerator     = require(ReplicatedStorage.Shared.Modules.LevelGenerator)
 local EconomyMath        = require(ReplicatedStorage.Shared.Modules.EconomyMath)
+local ChefMath           = require(ReplicatedStorage.Shared.Modules.ChefMath)
 
 local LevelService = {}
 
@@ -85,16 +87,20 @@ function LevelService:init()
 			end
 		end
 
-		-- Coin ceiling folds in the player's CURRENT mastery (pre-increment) and the
-		-- restaurant's prestige multiplier — exactly the boosts the client applied live.
+		-- Coin ceiling folds in the player's CURRENT mastery (pre-increment), the
+		-- restaurant's prestige multiplier, AND equipped chefs' aggregated tip mult —
+		-- exactly the boosts the client applied live. All only grow through validated
+		-- play, so recomputing the ceiling from the real profile can't be gamed.
 		local prestigeLevel = profile.prestige[restaurantId] or 0
 		local prestigeMult  = EconomyMath.prestigeMultiplier(prestigeLevel, Prestige)
+		local chefPassives  = ChefMath.aggregatePassives(profile.chefs, profile.equippedChefs, Chefs.list, GameConfig)
+		local globalMult    = prestigeMult * chefPassives.tipMult
 		local theoreticalMax = EconomyMath.theoreticalMax(
 			level.spawns, Recipes, Customers, GameConfig,
 			function(recipeId: string)
 				return MasteryService:multFor(profile, recipeId)
 			end,
-			prestigeMult
+			globalMult
 		)
 		if coinsEarned > theoreticalMax * GameConfig.COIN_OVERAGE_TOLERANCE then
 			warn(string.format("[LevelService] %s submitted %d coins (max %d) — rejected",

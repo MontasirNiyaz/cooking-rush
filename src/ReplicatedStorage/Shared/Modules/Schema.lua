@@ -156,6 +156,69 @@ function Schema.validatePrestige(prestige: any): Result
 	return r
 end
 
+-- ── Chefs (M8) ─────────────────────────────────────────────────────────────────
+function Schema.validateChefs(chefs: any): Result
+	local r: Result = { ok = true, errors = {} }
+	if type(chefs.RARITY_ORDER) ~= "table" then
+		err(r, "Chefs.RARITY_ORDER must be table"); return r
+	end
+	local validRarity: { [string]: boolean } = {}
+	for _, rar in ipairs(chefs.RARITY_ORDER) do validRarity[rar] = true end
+
+	if type(chefs.list) ~= "table" then
+		err(r, "Chefs.list must be table"); return r
+	end
+	local VALID_TAGS = { cookSpeedMult = true, tipMult = true, burnImmuneChance = true, autoServe = true }
+	for id, chef in pairs(chefs.list) do
+		local ctx = "Chef[" .. tostring(id) .. "]"
+		if chef.id ~= id                       then err(r, ctx .. ".id mismatch with key") end
+		if type(chef.displayName) ~= "string"  then err(r, ctx .. ".displayName must be string") end
+		if not validRarity[chef.rarity]        then err(r, ctx .. ".rarity invalid: " .. tostring(chef.rarity)) end
+		if type(chef.shinyChance) ~= "number"  then err(r, ctx .. ".shinyChance must be number") end
+		if type(chef.passives) ~= "table" then
+			err(r, ctx .. ".passives must be table")
+		else
+			for tag in pairs(chef.passives) do
+				if not VALID_TAGS[tag] then err(r, ctx .. ".passives unknown tag '" .. tostring(tag) .. "'") end
+			end
+		end
+	end
+	return r
+end
+
+-- ── RecruitCrates (M8) ─────────────────────────────────────────────────────────
+function Schema.validateRecruitCrates(crates: any, chefList: any, validRarity: any): Result
+	local r: Result = { ok = true, errors = {} }
+	for id, crate in pairs(crates) do
+		local ctx = "Crate[" .. tostring(id) .. "]"
+		if crate.id ~= id                  then err(r, ctx .. ".id mismatch with key") end
+		if type(crate.cost) ~= "table"     then err(r, ctx .. ".cost must be table") end
+		if type(crate.cost) == "table" and crate.cost.coins == nil and crate.cost.gems == nil then
+			err(r, ctx .. ".cost must specify coins and/or gems")
+		end
+		if type(crate.pity) ~= "table" then
+			err(r, ctx .. ".pity must be table")
+		else
+			if type(crate.pity.pulls) ~= "number" or crate.pity.pulls < 1 then
+				err(r, ctx .. ".pity.pulls must be a positive number")
+			end
+			if not validRarity[crate.pity.floorRarity] then
+				err(r, ctx .. ".pity.floorRarity invalid: " .. tostring(crate.pity.floorRarity))
+			end
+		end
+		if type(crate.dropTable) ~= "table" or #crate.dropTable == 0 then
+			err(r, ctx .. ".dropTable must be a non-empty table")
+		else
+			for i, e in ipairs(crate.dropTable) do
+				local ectx = ctx .. ".dropTable[" .. i .. "]"
+				if not chefList[e.chefId] then err(r, ectx .. " unknown chefId '" .. tostring(e.chefId) .. "'") end
+				if type(e.weight) ~= "number" or e.weight <= 0 then err(r, ectx .. ".weight must be > 0") end
+			end
+		end
+	end
+	return r
+end
+
 -- ── Master validator ──────────────────────────────────────────────────────────
 function Schema.validateAll()
 	local Shared = game:GetService("ReplicatedStorage").Shared
@@ -166,6 +229,8 @@ function Schema.validateAll()
 	local Customers    = require(Shared.Config.Customers)
 	local Mastery      = require(Shared.Config.Mastery)
 	local Prestige     = require(Shared.Config.Prestige)
+	local Chefs        = require(Shared.Config.Chefs)
+	local RecruitCrates = require(Shared.Config.RecruitCrates)
 
 	local allErrors: { string } = {}
 
@@ -179,6 +244,11 @@ function Schema.validateAll()
 	collect(Schema.validateRestaurants(Restaurants, Stations, Recipes))
 	collect(Schema.validateMastery(Mastery, Recipes))
 	collect(Schema.validatePrestige(Prestige))
+	collect(Schema.validateChefs(Chefs))
+
+	local validRarity: { [string]: boolean } = {}
+	for _, rar in ipairs(Chefs.RARITY_ORDER) do validRarity[rar] = true end
+	collect(Schema.validateRecruitCrates(RecruitCrates, Chefs.list, validRarity))
 
 	-- Customers: minimal check
 	for id, c in pairs(Customers) do

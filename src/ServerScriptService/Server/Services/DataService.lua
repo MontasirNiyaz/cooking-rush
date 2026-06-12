@@ -25,10 +25,15 @@ export type Profile = {
 	mastery: { [string]: { level: number, xp: number } },  -- recipeId → mastery
 	prestige: { [string]: number },                        -- restaurantId → prestige level
 	prestigeTokens: number,                                -- soft-premium currency
+	-- M8 chef collection
+	chefs: { { uid: number, chefId: string, shiny: boolean, level: number } },
+	equippedChefs: { number },                             -- equipped chef uids
+	pity: { [string]: number },                            -- crateId → consecutive sub-floor pulls
+	nextChefUid: number,                                   -- server-authoritative uid counter
 	version: number,
 }
 
-local CURRENT_VERSION = 2
+local CURRENT_VERSION = 3
 
 local DEFAULT_PROFILE: Profile = {
 	coins = 100, gems = 5, xp = 0, playerLevel = 1,
@@ -36,6 +41,7 @@ local DEFAULT_PROFILE: Profile = {
 	levelStars = {}, upgrades = {},
 	lastDailyClaim = 0, lastIncomeClaim = {},
 	mastery = {}, prestige = {}, prestigeTokens = 0,
+	chefs = {}, equippedChefs = {}, pity = {}, nextChefUid = 1,
 	version = CURRENT_VERSION,
 }
 
@@ -46,6 +52,13 @@ local MIGRATIONS: { (Profile) -> () } = {
 		p.mastery        = p.mastery or {}
 		p.prestige       = p.prestige or {}
 		p.prestigeTokens = p.prestigeTokens or 0
+	end,
+	-- v2 → v3: add M8 chef-collection fields.
+	[2] = function(p)
+		p.chefs         = p.chefs or {}
+		p.equippedChefs = p.equippedChefs or {}
+		p.pity          = p.pity or {}
+		p.nextChefUid   = p.nextChefUid or 1
 	end,
 }
 
@@ -90,6 +103,9 @@ local function load(player: Player): Profile
 		profile.lastIncomeClaim     = {}
 		profile.mastery             = {}
 		profile.prestige            = {}
+		profile.chefs               = {}
+		profile.equippedChefs       = {}
+		profile.pity                = {}
 	end
 	profiles[player.UserId] = profile
 	return profile

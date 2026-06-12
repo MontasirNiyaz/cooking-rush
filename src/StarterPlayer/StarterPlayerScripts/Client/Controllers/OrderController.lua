@@ -22,10 +22,10 @@ OrderController.ServeFail    = Signal.new()  -- fires(customerId, heldItemId)
 -- customer: Customer entity (has .orderIds, .tipCurve, .patienceFraction)
 -- heldItemId: the ingredient id the player is carrying
 -- Returns true on success.
--- Combined mastery + prestige earnings multiplier for the active restaurant/recipe.
--- Reads the shared profile cache; both factors default to 1 when the profile or
--- field is missing. The server independently recomputes this same ceiling, so the
--- client value here is purely for the live coin feel.
+-- Combined mastery + prestige + equipped-chef earnings multiplier for the active
+-- restaurant/recipe. Reads the shared profile cache + ChefController aggregate; all
+-- factors default to 1 when missing. The server independently recomputes this same
+-- ceiling, so the client value here is purely for the live coin feel.
 local function earningsMult(recipeId: string, restaurantId: string?): number
 	local ProfileController = require(script.Parent.ProfileController)
 	local profile = ProfileController:get()
@@ -37,7 +37,10 @@ local function earningsMult(recipeId: string, restaurantId: string?): number
 	local prestigeLevel = restaurantId and profile.prestige and profile.prestige[restaurantId] or 0
 	local prestigeMult  = EconomyMath.prestigeMultiplier(prestigeLevel, Prestige)
 
-	return masteryMult * prestigeMult
+	local ChefController = require(script.Parent.ChefController)
+	local chefTipMult    = ChefController:getPassives().tipMult
+
+	return masteryMult * prestigeMult * chefTipMult
 end
 
 function OrderController:tryServe(customer: any, heldItemId: string): boolean

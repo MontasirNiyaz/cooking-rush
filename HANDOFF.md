@@ -17,7 +17,8 @@ Build a Roblox cooking game ("Cooking Rush") using a data-driven architecture wh
 | M4 — DataStore profiles, SubmitLevelResult server validation | **Complete** |
 | M5 — ProgressionService, UpgradeService, Shop UI | **Complete** |
 | M6 — Sushi restaurant (config-only) | **Complete** |
-| M7 — Meta-progression spine: Recipe Mastery + Restaurant Prestige | **Complete** (code + unit tests; live playthrough pending Rojo connect) |
+| M7 — Meta-progression spine: Recipe Mastery + Restaurant Prestige | **Complete** (code + unit tests + Studio verification) |
+| M8 — Chef Collection & Recruitment (gacha, equip, fusion, passives) | **Complete** (code + 31 new specs + Studio integration verified) |
 
 ---
 
@@ -91,6 +92,14 @@ function Station:interact(heldItemId: string?): (string?, boolean)
 | `src/ServerScriptService/Server/Services/ProgressionService.lua` | XP/levels/unlocks + the **franchise** (prestige) transaction |
 | `src/ReplicatedStorage/Shared/Config/Mastery.lua` | Recipe-mastery curve (global default + sparse per-recipe overrides) |
 | `src/ReplicatedStorage/Shared/Config/Prestige.lua` | Prestige curve params (earnings mult, token grant, equip-slot hook for M8) |
+| `src/ReplicatedStorage/Shared/Config/Chefs.lua` | Chef roster, rarity ladder/colours, passive effect-tags |
+| `src/ReplicatedStorage/Shared/Config/RecruitCrates.lua` | Gacha crates: cost + weighted drop table + pity rule |
+| `src/ReplicatedStorage/Shared/Modules/GachaMath.lua` | Pure weighted-roll + pity (server-authoritative drops) |
+| `src/ReplicatedStorage/Shared/Modules/ChefMath.lua` | Pure passive aggregation, equip-slot count, fusion cost |
+| `src/ServerScriptService/Server/Services/RecruitService.lua` | Server-authoritative recruit (rolls, charges, mints, pity) |
+| `src/ServerScriptService/Server/Services/ChefService.lua` | Equip/unequip/fuse; equip-slot cap from total prestige |
+| `src/StarterPlayer/.../Controllers/ChefController.lua` | Aggregates equipped passives at level start; drives autoServe |
+| `src/StarterPlayer/.../Controllers/ChefUIController.lua` | Chefs panel: recruit (published odds), collection, equip, fuse |
 
 ---
 
@@ -136,13 +145,50 @@ shared across recipes, so mapping a recipe's mastery onto a station's `cookTime`
 design pass (which dish "owns" a shared cook step?). Only the tip-value bonus affects live
 economy today. Wire cookSpeed when that ownership question is settled.
 
-## Next Steps (M8 — Chef Collection & Recruitment)
-The headline collection/gacha system. Chefs are config rows whose `passives` are effect
-tags consumed by existing systems (`cookSpeedMult`, `tipMult`, `autoServe`, …). Build:
-`Chefs.lua` + `RecruitCrates.lua` configs, a server-authoritative seeded `RecruitService`
-with a pity counter, profile `chefs`/`equippedChefs` (equip cap grows on total prestige —
-the M7→M8 tie), a client `ChefController` that applies equipped passive tags at level
-start, and a duplicate→fusion sink. See the M7–M12 roadmap for the full schema.
+## M8 — Chef Collection & Recruitment
+
+The headline collection system. Chefs are this game's pets: collectible, rarity-tiered,
+equip-able config rows whose `passives` are **effect tags consumed by the existing engine**.
+Adding a chef is one row in `Chefs.lua`; only a brand-new *tag* would touch code.
+
+### Effect tags (all wired live)
+- `cookSpeedMult` → `Station:setChefModifiers` shortens effective cook time (>1 = faster)
+- `tipMult` → folded into `OrderController` `earningsMult` (and the server ceiling)
+- `burnImmuneChance` → `Station._cookerTick` rolls a one-time save per slot before a burn
+- `autoServe` → `ChefController` calls `CustomerController:autoServeOne()` on an interval,
+  reusing the normal serve path so combo/mastery/earnings all apply
+
+### Server authority (the important part for a gacha + tradeable economy later)
+- `RecruitService` rolls with its **own** `Random`, applies the pity floor, charges the
+  cost, and mints the chef with a server-issued `nextChefUid`. Clients send only the intent.
+- `ChefService` validates equip (slot cap = `CHEF_BASE_EQUIP_SLOTS + equipSlotsPerLevel *
+  totalPrestige` — the M7→M8 tie) and fusion (consume `CHEF_FUSION_DUPES` dupes → +1 level,
+  burning least-valuable copies first: unequipped, non-shiny, lower-level).
+- The earnings ceiling in `SubmitLevelResult` now folds equipped chefs' aggregated `tipMult`
+  into `globalMult` alongside prestige, so chef-boosted coins stay validated and ungameable.
+- Pure, unit-tested math: `GachaMath` (rolling/pity) and `ChefMath` (aggregation/slots/fusion)
+  — 31 new specs, suite now **116/116**.
+
+### Profile v3
+Added `chefs` ({uid, chefId, shiny, level}), `equippedChefs` (uids), `pity` (per-crate
+counter), `nextChefUid`. Migration `[2]` in `DataService`; reconcile + fallback handle
+existing saves.
+
+### Reserved
+- **In-world chef models** (`Chef.model`) aren't spawned yet — passives are fully live, but
+  the followed/kitchen model rendering is a visual follow-up (needs assets + world layout).
+- `autoServe` delivers via the existing serve path; a bespoke "chef walks the dish over"
+  animation is also model-dependent and deferred.
+
+## Next Steps (M9 — Idle / Passive Empire)
+Convert owned-but-idle restaurants into offline income. Assign equipped/benched chefs to
+auto-run a restaurant; output scales with chef passives + prestige + mastery. Build a pure
+`IdleMath.accrue(state, elapsed) -> earnings` (unit-tested), an `IdleService` that computes
+accrued earnings from a `lastCollect` timestamp on join (capped by an offline-cap that
+upgrades extend), a "Collect" UI on the world map, and server-side `elapsed` clamping
+against real timestamp deltas (never trust the client clock). See the M7–M12 roadmap.
+
+### Full cheeseburger serve flow (reference for testing)
 
 ### Full cheeseburger serve flow (reference for testing)
 1. **Bun Shelf** (back row) → E → hold `bun`

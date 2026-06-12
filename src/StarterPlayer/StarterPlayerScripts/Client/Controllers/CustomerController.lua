@@ -147,6 +147,30 @@ local function attachToSeat(customer: any, idx: number)
 	end)
 end
 
+-- Auto-serve one pending order of one waiting customer, as if the player handed
+-- over the finished dish (the autoServe chef passive). Reuses the normal serve
+-- path so combo, mastery, and earnings multipliers all apply identically. Returns
+-- true if a dish was delivered.
+function CustomerController:autoServeOne(): boolean
+	local OrderController = require(script.Parent.OrderController)
+	for id, customer in pairs(_active) do
+		if customer.state == Enums.CustomerState.Waiting and #customer.pendingOrders > 0 then
+			-- Serving by the recipe id itself fulfils that order (recipe.id == dish item).
+			local recipeId = customer.pendingOrders[1]
+			if OrderController:tryServe(customer, recipeId) then
+				local idx = _customerSeat[id]
+				local pr  = idx and _seatPrompt[idx]
+				if pr then pr.ActionText = buildOrderText(customer) end
+				if #customer.pendingOrders == 0 then
+					customer:serve()
+				end
+				return true
+			end
+		end
+	end
+	return false
+end
+
 function CustomerController:init()
 	local LevelController = require(script.Parent.LevelController)
 

@@ -80,6 +80,46 @@ The architecture's central claim, validated: the full game loop runs for Sushi w
 
 ---
 
+## 9. M8 — Chef Collection & Recruitment `[milestone:M8]` — DONE
+
+The headline collection/gacha system. Chefs are config rows; their passives are effect tags
+the existing engine already consumes, so a 200-chef roster is pure data.
+
+### 9.1 Chef data + passives
+- [x] `Config/Chefs.lua` — 11-chef roster across 6 rarities, with a rarity ladder, colours,
+  and composable passive tags. `Config/RecruitCrates.lua` — two crates (coins/gems) with
+  weighted drop tables + pity rules.
+- [x] Passive tags wired into existing systems: `cookSpeedMult` + `burnImmuneChance` →
+  `Station` cooker; `tipMult` → `OrderController` earnings (+ server ceiling); `autoServe` →
+  `ChefController` timer → `CustomerController:autoServeOne` (reuses the normal serve path).
+
+### 9.2 Recruitment (server-authoritative gacha)
+- [x] `RecruitService` rolls with its own `Random`, charges cost (coins/gems, atomic +
+  refund), applies the **pity** floor, and mints the chef with a server-issued uid.
+- [x] Pure `GachaMath`: `pick` (weighted, deterministic on a [0,1) roll), `filterByMinRarity`,
+  `nextPity`, `resolveRecruit`. Drop odds published in-UI (aggregated per rarity).
+
+### 9.3 Equip / inventory / fusion
+- [x] Profile v3: `chefs`, `equippedChefs`, `pity`, `nextChefUid` (+ migration `[2]`).
+- [x] `ChefService` equip/unequip with a slot cap that grows on total prestige
+  (`ChefMath.equipSlots`, the M7→M8 tie), and fusion (`CHEF_FUSION_DUPES` dupes → +1 level,
+  burning least-valuable copies first). All server-validated + idempotent.
+- [x] Client: `ChefController` aggregates equipped passives at level start; `ChefUIController`
+  is a data-driven Chefs panel (recruit w/ odds, collection, equip/unequip, fuse).
+- [x] Pure `ChefMath`: passive aggregation (mult stacking, independent burn-immunity, OR
+  autoServe), level/shiny scaling, equip slots, fusion cost. 31 new specs.
+
+**Verification (Studio, Rojo-synced):** clean Schema-validated boot; full suite **116/116**
+(+31 over M7's 85). End-to-end integration confirmed against a controlled profile: recruit
+charges cost + mints chef + advances pity; equip enforces the 3-slot cap and grows to 5 at
+prestige 2; fusion consumes 3 dupes → level 2 and re-gates on too few dupes; aggregated
+passives reflect the leveled chef.
+
+**Reserved:** in-world chef models (`Chef.model`) aren't spawned yet (passives are fully
+live; model rendering needs assets + world layout — see HANDOFF M8 notes).
+
+---
+
 ## 8. M7 — Meta-progression spine: Recipe Mastery + Restaurant Prestige `[milestone:M7]` — DONE
 
 First incremental-growth milestone. Both systems are formula + config (no authored

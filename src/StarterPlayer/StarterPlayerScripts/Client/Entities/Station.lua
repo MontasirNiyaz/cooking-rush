@@ -36,6 +36,7 @@ type CookerSlot = {
 	cookTimer: number,
 	burnTimer: number,
 	state: "cooking" | "done" | "burnt",
+	_savedFromBurn: boolean?,  -- chef burn-immunity already spent on this slot
 }
 
 -- ── Station constructor ───────────────────────────────────────────────────────
@@ -56,6 +57,10 @@ function Station.new(baseConfig: any, upgradeLevel: number): Station
 		StateChanged = Signal.new(),
 		ItemReady    = Signal.new(),
 		ItemBurnt    = Signal.new(),
+
+		-- Chef passive modifiers (M8): >1 cookSpeed = faster; burnImmune = save chance.
+		_cookSpeedMult    = 1,
+		_burnImmuneChance = 0,
 
 		-- Cooker
 		_slots = {} :: { CookerSlot },
@@ -84,6 +89,14 @@ function Station:setUpgradeLevel(upgradeLevel: number)
 	end
 end
 
+-- Apply equipped-chef passive modifiers to this station. cookSpeedMult (>1 =
+-- faster) shortens the effective cook time; burnImmuneChance gives each finished
+-- item a chance to survive one burn deadline. Set at the start of each level.
+function Station:setChefModifiers(cookSpeedMult: number, burnImmuneChance: number)
+	self._cookSpeedMult    = (cookSpeedMult and cookSpeedMult > 0) and cookSpeedMult or 1
+	self._burnImmuneChance = burnImmuneChance or 0
+end
+
 -- ── Cooker behaviour ──────────────────────────────────────────────────────────
 
 function Station:_cookerInteract(heldItemId: string?): (string?, boolean)
@@ -109,20 +122,30 @@ function Station:_cookerInteract(heldItemId: string?): (string?, boolean)
 end
 
 function Station:_cookerTick(dt: number)
+	-- Chef cook-speed shortens the effective cook time (>1 = faster).
+	local effectiveCookTime = self.config.cookTime / self._cookSpeedMult
 	for i = #self._slots, 1, -1 do
 		local slot = self._slots[i]
 		if slot.state == "cooking" then
 			slot.cookTimer += dt
-			if slot.cookTimer >= self.config.cookTime then
+			if slot.cookTimer >= effectiveCookTime then
 				slot.state = "done"
 				self.ItemReady:Fire(slot.item, i)
 			end
 		elseif slot.state == "done" then
 			slot.burnTimer += dt
 			if slot.burnTimer >= self.config.burnTime then
-				slot.state = "burnt"
-				table.remove(self._slots, i)
-				self.ItemBurnt:Fire(i)
+				-- Burn-immunity: a chance to survive this burn deadline once, resetting
+				-- the burn timer instead of discarding the dish.
+				if self._burnImmuneChance > 0 and not slot._savedFromBurn
+					and math.random() < self._burnImmuneChance then
+					slot._savedFromBurn = true
+					slot.burnTimer = 0
+				else
+					slot.state = "burnt"
+					table.remove(self._slots, i)
+					self.ItemBurnt:Fire(i)
+				end
 			end
 		end
 	end

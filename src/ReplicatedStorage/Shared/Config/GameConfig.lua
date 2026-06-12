@@ -44,4 +44,12 @@ return {
 	-- Daily reward
 	DAILY_COIN_BASE         = 50,
 	DAILY_INTERVAL_SECONDS  = 86400,
+
+	-- Chefs (M8)
+	CHEF_BASE_EQUIP_SLOTS   = 3,     -- equip slots before any prestige
+	CHEF_LEVEL_BONUS        = 0.15,  -- each fusion level adds 15% of a chef's base bonus
+	CHEF_SHINY_BONUS_MULT   = 2.0,   -- a shiny doubles its bonus portion
+	CHEF_FUSION_DUPES       = 3,     -- duplicate chefs consumed per fusion level-up
+	CHEF_MAX_LEVEL          = 10,    -- fusion level cap
+	CHEF_AUTOSERVE_INTERVAL = 6,     -- seconds between autoServe deliveries
 }

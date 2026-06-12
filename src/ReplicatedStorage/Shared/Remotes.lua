@@ -34,6 +34,13 @@ local Remotes = {
 	ClaimDaily           = makeRemote("RemoteFunction", "ClaimDaily"),
 	-- Client → Server: franchise (prestige) a fully 3-starred restaurant
 	FranchiseRestaurant  = makeRemote("RemoteFunction", "FranchiseRestaurant"),
+	-- Client → Server: recruit a chef from a crate (server rolls authoritatively)
+	Recruit              = makeRemote("RemoteFunction", "Recruit"),
+	-- Client → Server: equip / unequip a chef by uid
+	EquipChef            = makeRemote("RemoteFunction", "EquipChef"),
+	UnequipChef          = makeRemote("RemoteFunction", "UnequipChef"),
+	-- Client → Server: fuse duplicate chefs to level up one
+	FuseChef             = makeRemote("RemoteFunction", "FuseChef"),
 	-- Client → Server: fetch own profile for UI
 	GetProfile           = makeRemote("RemoteFunction", "GetProfile"),
 }
