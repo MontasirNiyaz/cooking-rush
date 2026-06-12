@@ -36,6 +36,11 @@ return {
 
 	-- DataStore
 	DATASTORE_NAME          = "CookingRushV1",
+	-- placeId → environment. Anything not listed resolves to "dev", so production
+	-- must be opted in here (add the live place id(s) as "prod").
+	PLACE_ENV = {
+		-- [0] = "prod",
+	},
 	AUTOSAVE_INTERVAL       = 60,    -- seconds
 	-- Cross-server session lock: how long a lock stays valid without a refresh.
 	-- Must comfortably exceed AUTOSAVE_INTERVAL (every save refreshes it); a

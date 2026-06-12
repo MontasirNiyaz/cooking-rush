@@ -7,7 +7,7 @@ criteria all pass. Exit criteria gate the next phase.
 - [x] P0.1 Level-session validation: anti-farm + server-computed stars (CRITICAL)
 - [x] P0.2 Remote rate limiting
 - [x] P0.3 Profile session locking
-- [ ] P0.4 Dev/prod DataStore namespacing
+- [x] P0.4 Dev/prod DataStore namespacing
 - [ ] P0.5 Real-config invariant + snapshot test suite
 - [ ] P0.6 Gate Studio auto-start behind DEBUG_AUTOSTART
 - [ ] P0.7 Doc reconciliation (multi-output dispenser = won't-do)

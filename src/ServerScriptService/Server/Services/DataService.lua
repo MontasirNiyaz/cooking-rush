@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local GameConfig  = require(ReplicatedStorage.Shared.Config.GameConfig)
 local SessionLock = require(ReplicatedStorage.Shared.Modules.SessionLock)
+local EnvConfig   = require(ReplicatedStorage.Shared.Modules.EnvConfig)
 
 export type Profile = {
 	coins: number,
@@ -43,7 +44,9 @@ local MIGRATIONS: { (Profile) -> () } = {
 	-- [1] = function(p) p.newField = "default" end,
 }
 
-local store: DataStore = DataStoreService:GetDataStore(GameConfig.DATASTORE_NAME)
+local ENV: EnvConfig.Env  = EnvConfig.resolveEnv(game.PlaceId, GameConfig.PLACE_ENV)
+local STORE_NAME: string  = EnvConfig.storeName(GameConfig.DATASTORE_NAME, ENV)
+local store: DataStore    = DataStoreService:GetDataStore(STORE_NAME)
 local profiles: { [number]: Profile } = {}
 local saving:   { [number]: boolean } = {}  -- userId → save in flight (no overlap)
 
@@ -175,6 +178,8 @@ local function save(player: Player, release: boolean?)
 end
 
 function DataService:init()
+	print(string.format("[DataService] environment=%s placeId=%d store=%q", ENV, game.PlaceId, STORE_NAME))
+
 	Players.PlayerAdded:Connect(load)
 	Players.PlayerRemoving:Connect(function(player)
 		save(player, true)  -- final save + release the lock
