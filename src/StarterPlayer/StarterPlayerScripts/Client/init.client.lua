@@ -5,6 +5,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 ReplicatedStorage:WaitForChild("Shared", 15)
 
+local GameConfig  = require(ReplicatedStorage.Shared.Config.GameConfig)
+
 local Controllers = script.Controllers
 
 local ComboController    = require(Controllers.ComboController)
@@ -27,10 +29,11 @@ ShopController:init()
 
 print("[Client] Cooking Rush client ready.")
 
--- Auto-start level 1 when running inside Studio (M1 test convenience).
-if RunService:IsStudio() then
+-- Dev convenience: auto-start level 1, but ONLY when the debug flag is on AND
+-- we're in Studio. Defaults off so production boots into the normal menu/idle flow.
+if GameConfig.DEBUG_AUTOSTART and RunService:IsStudio() then
 	task.delay(3, function()
-		print("[Client] Studio: auto-starting FastFood level 1")
+		print("[Client] DEBUG_AUTOSTART: auto-starting FastFood level 1")
 		LevelController:startLevel("fastfood", 1)
 	end)
 end

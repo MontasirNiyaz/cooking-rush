@@ -9,7 +9,7 @@ criteria all pass. Exit criteria gate the next phase.
 - [x] P0.3 Profile session locking
 - [x] P0.4 Dev/prod DataStore namespacing
 - [x] P0.5 Real-config invariant + snapshot test suite
-- [ ] P0.6 Gate Studio auto-start behind DEBUG_AUTOSTART
+- [x] P0.6 Gate Studio auto-start behind DEBUG_AUTOSTART
 - [ ] P0.7 Doc reconciliation (multi-output dispenser = won't-do)
 - **Exit:** security specs green; two-server clobber test passes; real-config suite green; env split verified.
 

@@ -2,6 +2,11 @@
 -- Global tuning constants. No magic numbers anywhere else in the codebase.
 
 return {
+	-- Debug toggles (must default OFF for production builds)
+	-- When true AND running in Studio, the client auto-starts FastFood level 1 a
+	-- few seconds after boot — a dev convenience that must never ship enabled.
+	DEBUG_AUTOSTART         = false,
+
 	-- Combo streak tiers: index = tier (1-based), value = multiplier
 	COMBO_MULTIPLIERS       = { 1.0, 1.1, 1.25, 1.5 },
 	-- Minimum consecutive serves to reach each tier

@@ -60,7 +60,7 @@ function Station:interact(heldItemId: string?): (string?, boolean)
 - **Two-value interact return** — changed `interact() → string?` to `interact() → (string?, boolean)`. The `consumed` boolean is the only reliable way to distinguish "item accepted" from "nothing happened" when both return nil.
 - **Ingredient shelves as Dispensers** with `maxStock=999, refillTime=1` — unlimited raw materials without special-casing.
 - **DataService pcall fallback** — `GetAsync` fails in Studio (no DataStore access); code falls through to `DEFAULT_PROFILE` with `fastfood=true`, so `RequestLevelStart` always succeeds without network.
-- **Studio auto-start**: `if RunService:IsStudio() then task.delay(3, LevelController:startLevel(...)) end` in `init.client.lua`.
+- **Studio auto-start** (P0.6): gated behind `GameConfig.DEBUG_AUTOSTART` (defaults **false**). When true AND in Studio, `init.client.lua` auto-starts FastFood level 1 ~3s after boot. Flip the flag on for the old dev convenience; production boots into the normal menu/idle flow.
 - **M0 verification** via direct `execute_luau` assertions — bypasses TestEZ global injection problem with `describe`/`it`/`expect` in strict Luau.
 - **Disabling StreamingEnabled** — workspace Parts exist in Edit mode but `GetChildren()` returns 0 on the client at startup when streaming is on. Set `workspace.StreamingEnabled = false` to fix.
 
@@ -125,10 +125,8 @@ Full level state machine: Idle → Intro (3 s) → Playing → Results. Customer
 2. Confirm `workspace.StreamingEnabled == false`.
 3. Confirm `Workspace.Stations` has 8 Parts with correct `StationId` attributes.
 4. Confirm `Workspace.Seats` has 3 Parts.
-5. Press **Play** — after 3 s the console should print:
-   ```
-   [StationController] Wired 8 stations
-   [CustomerController] Found 3 seats
-   [Client] Studio: auto-starting FastFood level 1
-   ```
+5. Press **Play** — the console should print the boot lines (station/seat wiring,
+   server ready). With `GameConfig.DEBUG_AUTOSTART = true` it also prints
+   `[Client] DEBUG_AUTOSTART: auto-starting FastFood level 1` ~3 s later; with the
+   default (false) it stays in the menu/idle flow until a level is started.
 6. Walk within 8 studs of any station Part — ProximityPrompt appears with action text.
