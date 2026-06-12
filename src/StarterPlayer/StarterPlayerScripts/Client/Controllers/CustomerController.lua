@@ -1,16 +1,20 @@
 --!strict
 -- Spawns and ticks customers from the level's spawn list.
--- Assigns each arriving customer to a seat Part in Workspace.Seats and
--- wires a ProximityPrompt so the player can serve them.
+-- Assigns each arriving customer to a Part tagged "Seat" and wires a
+-- ProximityPrompt so the player can serve them. Seats bind by CollectionService
+-- tag (streaming-safe) rather than a Workspace.Seats snapshot (#13).
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService        = game:GetService("RunService")
 
 local CustomerEntity = require(script.Parent.Parent.Entities.Customer)
+local TagBinder      = require(script.Parent.Parent.TagBinder)
 local Enums          = require(ReplicatedStorage.Shared.Modules.Enums)
 local Customers      = require(ReplicatedStorage.Shared.Config.Customers)
 local Signal         = require(ReplicatedStorage.Shared.Packages.Signal)
 local Trove          = require(ReplicatedStorage.Shared.Packages.Trove)
+
+local SEAT_TAG = "Seat"
 
 local CustomerController = {}
 CustomerController.__index = CustomerController
@@ -18,17 +22,23 @@ CustomerController.__index = CustomerController
 CustomerController.CustomerArrived = Signal.new()  -- fires(customer)
 CustomerController.CustomerLeft    = Signal.new()  -- fires(customer, wasServed: boolean)
 
-local _active: { [string]: any }        = {}
-local _nextSpawnIndex                    = 1
-local _trove                             = Trove.new()
+local _active: { [string]: any } = {}
+local _nextSpawnIndex            = 1
+local _trove                     = Trove.new()
 
--- Seat management: Parts in Workspace.Seats, assigned round-robin.
-local _seats: { BasePart }      = {}
-local _seatFree: { boolean }    = {}
-local _customerSeat: { [string]: number } = {}  -- customerId → seat index
-local _seatPrompt: { [number]: ProximityPrompt } = {}
-local _seatBar:    { [number]: BillboardGui } = {}   -- seat index → patience BillboardGui
-local _seatBarFill: { [number]: Frame } = {}         -- seat index → fill bar Frame
+-- Seat state keyed by the seat Part so seats can stream in/out individually.
+type SeatState = {
+	free: boolean,
+	prompt: ProximityPrompt?,
+	bar: BillboardGui?,
+	fill: Frame?,
+}
+local _seatState: { [BasePart]: SeatState } = {}
+local _seatOrder: { BasePart }              = {}  -- insertion order → stable round-robin
+local _customerSeat: { [string]: BasePart } = {}  -- customerId → seat Part
+
+local NEUTRAL = BrickColor.new("Medium stone grey")
+local TAKEN   = BrickColor.new("Bright green")
 
 -- Builds a floating patience bar above a seat. Returns the fill Frame to drive.
 local function makePatienceBar(seat: BasePart): (BillboardGui, Frame)
@@ -62,9 +72,10 @@ local function allDone(level: any): boolean
 	return _nextSpawnIndex > #level.spawns and next(_active) == nil
 end
 
-local function freeSeat(): number?
-	for i, free in ipairs(_seatFree) do
-		if free then return i end
+local function freeSeat(): BasePart?
+	for _, seat in ipairs(_seatOrder) do
+		local st = _seatState[seat]
+		if st and st.free then return seat end
 	end
 	return nil
 end
@@ -74,38 +85,29 @@ local function buildOrderText(customer: any): string
 	return "Serve: " .. table.concat(customer.pendingOrders, ", ")
 end
 
-local function releaseSeat(customerId: string)
-	local idx = _customerSeat[customerId]
-	if not idx then return end
-	_customerSeat[customerId] = nil
-	_seatFree[idx] = true
-
-	local pr = _seatPrompt[idx]
-	if pr then
-		pr:Destroy()
-		_seatPrompt[idx] = nil
-	end
-
-	local bar = _seatBar[idx]
-	if bar then
-		bar:Destroy()
-		_seatBar[idx]     = nil
-		_seatBarFill[idx] = nil
-	end
-
-	local seat = _seats[idx]
-	if seat then
-		seat.BrickColor = BrickColor.new("Medium stone grey")
-	end
+-- Tear down the visible prompt/bar on a seat and mark it free again.
+local function clearSeatVisuals(seat: BasePart)
+	local st = _seatState[seat]
+	if not st then return end
+	if st.prompt then st.prompt:Destroy(); st.prompt = nil end
+	if st.bar then st.bar:Destroy(); st.bar = nil; st.fill = nil end
+	st.free = true
+	seat.BrickColor = NEUTRAL
 end
 
-local function attachToSeat(customer: any, idx: number)
-	_customerSeat[customer.id] = idx
-	_seatFree[idx] = false
-
-	local seat = _seats[idx]
+local function releaseSeat(customerId: string)
+	local seat = _customerSeat[customerId]
 	if not seat then return end
-	seat.BrickColor = BrickColor.new("Bright green")
+	_customerSeat[customerId] = nil
+	clearSeatVisuals(seat)
+end
+
+local function attachToSeat(customer: any, seat: BasePart)
+	local st = _seatState[seat]
+	if not st then return end
+	_customerSeat[customer.id] = seat
+	st.free = false
+	seat.BrickColor = TAKEN
 
 	-- ProximityPrompt for serving
 	local prompt = Instance.new("ProximityPrompt")
@@ -114,12 +116,12 @@ local function attachToSeat(customer: any, idx: number)
 	prompt.MaxActivationDistance = 8
 	prompt.HoldDuration = 0
 	prompt.Parent = seat
-	_seatPrompt[idx] = prompt
+	st.prompt = prompt
 
 	-- Patience bar above the seat
 	local bb, fill = makePatienceBar(seat)
-	_seatBar[idx]     = bb
-	_seatBarFill[idx] = fill
+	st.bar  = bb
+	st.fill = fill
 
 	prompt.Triggered:Connect(function(_player: Player)
 		if customer.state ~= Enums.CustomerState.Waiting then return end
@@ -135,7 +137,6 @@ local function attachToSeat(customer: any, idx: number)
 		local ok = OrderController:tryServe(customer, heldId)
 		if ok then
 			StationController.heldItem.itemId = nil
-			-- Update prompt with remaining orders
 			prompt.ActionText = buildOrderText(customer)
 
 			if #customer.pendingOrders == 0 then
@@ -147,41 +148,43 @@ local function attachToSeat(customer: any, idx: number)
 	end)
 end
 
+-- Bind one tagged seat Part.
+local function bindSeat(part: Instance): any?
+	if not part:IsA("BasePart") then return nil end
+	if _seatState[part] then return nil end
+	_seatState[part] = { free = true }
+	table.insert(_seatOrder, part)
+	part.BrickColor = NEUTRAL
+	return part
+end
+
+local function unbindSeat(part: Instance, _state: any)
+	local seat = part :: BasePart
+	-- If a customer occupied this seat, drop the mapping so they don't reference
+	-- a torn-down seat (they keep ticking and leave on patience expiry).
+	for cid, s in pairs(_customerSeat) do
+		if s == seat then _customerSeat[cid] = nil end
+	end
+	clearSeatVisuals(seat)
+	_seatState[seat] = nil
+	local i = table.find(_seatOrder, seat)
+	if i then table.remove(_seatOrder, i) end
+end
+
 function CustomerController:init()
 	local LevelController = require(script.Parent.LevelController)
 
-	-- Discover seat Parts once at init time
-	local seatsFolder = workspace:WaitForChild("Seats", 15) :: Folder?
-	if seatsFolder then
-		for _, child in ipairs(seatsFolder:GetChildren()) do
-			if child:IsA("BasePart") then
-				table.insert(_seats, child)
-				table.insert(_seatFree, true)
-			end
-		end
-		print(string.format("[CustomerController] Found %d seats", #_seats))
-	else
-		warn("[CustomerController] Workspace.Seats not found")
-	end
+	-- Bind seats by tag — streaming-safe and decoupled from the folder name.
+	_trove:Add(TagBinder.bind(SEAT_TAG, bindSeat, unbindSeat))
 
 	LevelController.StateChanged:Connect(function(newState: string)
 		if newState == Enums.LevelState.Playing then
 			_active         = {}
 			_nextSpawnIndex = 1
 			_customerSeat   = {}
-			-- Reset seat colours and tear down any leftover prompts/bars
-			for i, seat in ipairs(_seats) do
-				seat.BrickColor = BrickColor.new("Medium stone grey")
-				_seatFree[i] = true
-				if _seatPrompt[i] then
-					_seatPrompt[i]:Destroy()
-					_seatPrompt[i] = nil
-				end
-				if _seatBar[i] then
-					_seatBar[i]:Destroy()
-					_seatBar[i]     = nil
-					_seatBarFill[i] = nil
-				end
+			-- Reset every bound seat: free it and tear down leftover prompts/bars.
+			for seat in pairs(_seatState) do
+				clearSeatVisuals(seat)
 			end
 		elseif newState == Enums.LevelState.Idle then
 			for id, c in pairs(_active) do
@@ -207,8 +210,8 @@ function CustomerController:init()
 			if LevelController.elapsed < entry.atSecond then break end
 
 			-- Hold the next arrival until a seat opens up.
-			local seatIdx = freeSeat()
-			if not seatIdx then break end
+			local seat = freeSeat()
+			if not seat then break end
 
 			local archetype = Customers[entry.customerTypeId]
 			if not archetype then
@@ -221,7 +224,7 @@ function CustomerController:init()
 			_active[customer.id] = customer
 			_nextSpawnIndex += 1
 
-			attachToSeat(customer, seatIdx)
+			attachToSeat(customer, seat)
 
 			CustomerController.CustomerArrived:Fire(customer)
 			print(string.format("[CustomerController] Customer %s arrived (orders: %s)",
@@ -233,13 +236,13 @@ function CustomerController:init()
 			customer:tick(dt)
 
 			-- Drive the patience bar for this customer's seat
-			local seatIdx = _customerSeat[id]
-			if seatIdx then
-				local fill = _seatBarFill[seatIdx]
-				if fill then
+			local seat = _customerSeat[id]
+			if seat then
+				local st = _seatState[seat]
+				if st and st.fill then
 					local frac = customer:getPatienceFraction()
-					fill.Size = UDim2.new(frac, 0, 1, 0)
-					fill.BackgroundColor3 = frac < 0.25
+					st.fill.Size = UDim2.new(frac, 0, 1, 0)
+					st.fill.BackgroundColor3 = frac < 0.25
 						and Color3.fromRGB(220, 60, 60)
 						or  Color3.fromRGB(80, 220, 90)
 				end

@@ -50,8 +50,11 @@ function Station:interact(heldItemId: string?): (string?, boolean)
 - `Workspace.Stations/` — 8 Parts, each with `StationId` string attribute
   - Back row (Z=−14, green): `raw_patty_shelf`, `raw_fries_shelf`, `bun_shelf`, `cheese_shelf`
   - Middle row (Z=−7): `grill` (red), `fryer` (red), `bun_counter` (yellow), `drink_dispenser` (blue)
-- `Workspace.Seats/` — 3 orange Parts at Z=+4 (`Seat1`, `Seat2`, `Seat3`)
-- `Workspace.StreamingEnabled = false` (required — streaming caused `GetChildren()` to return empty)
+- `Workspace.Seats/` — 3 orange Parts at Z=+4 (`Seat1`, `Seat2`, `Seat3`), each tagged `Seat`
+- Station Parts carry both a `StationId` attribute and a `Station` CollectionService tag.
+- `Workspace.StreamingEnabled = true` (P1.0) — controllers bind by tag (`Client/TagBinder.lua`),
+  so Parts that stream in/out bind/unbind cleanly. Run `tools/build_world.lua` (idempotent) to
+  build + tag the world.
 
 ---
 
@@ -62,7 +65,7 @@ function Station:interact(heldItemId: string?): (string?, boolean)
 - **DataService pcall fallback** — `GetAsync` fails in Studio (no DataStore access); code falls through to `DEFAULT_PROFILE` with `fastfood=true`, so `RequestLevelStart` always succeeds without network.
 - **Studio auto-start** (P0.6): gated behind `GameConfig.DEBUG_AUTOSTART` (defaults **false**). When true AND in Studio, `init.client.lua` auto-starts FastFood level 1 ~3s after boot. Flip the flag on for the old dev convenience; production boots into the normal menu/idle flow.
 - **M0 verification** via direct `execute_luau` assertions — bypasses TestEZ global injection problem with `describe`/`it`/`expect` in strict Luau.
-- **Disabling StreamingEnabled** — workspace Parts exist in Edit mode but `GetChildren()` returns 0 on the client at startup when streaming is on. Set `workspace.StreamingEnabled = false` to fix.
+- **Tag-based binding (P1.0)** — the old `Workspace.Stations:GetChildren()` snapshot saw nothing under StreamingEnabled (Parts hadn't streamed in yet) and never noticed stream-in/out. Replaced with CollectionService `Station`/`Seat` tags bound via `Client/TagBinder.lua` (GetTagged + added/removed signals, Trove cleanup). StreamingEnabled is now **on**.
 
 ## What Didn't Work
 
@@ -122,9 +125,10 @@ Full level state machine: Idle → Intro (3 s) → Playing → Results. Customer
 ## Studio Setup Checklist (fresh session)
 
 1. Open `C:\Users\19146\cooking-rush` in Studio (place file or Rojo sync).
-2. Confirm `workspace.StreamingEnabled == false`.
-3. Confirm `Workspace.Stations` has 8 Parts with correct `StationId` attributes.
-4. Confirm `Workspace.Seats` has 3 Parts.
+2. Confirm `workspace.StreamingEnabled == true` (P1.0). If the world is missing tags,
+   run `tools/build_world.lua` in the command bar (Edit mode) — idempotent.
+3. Confirm station Parts have a `StationId` attribute **and** the `Station` tag.
+4. Confirm seat Parts carry the `Seat` tag.
 5. Press **Play** — the console should print the boot lines (station/seat wiring,
    server ready). With `GameConfig.DEBUG_AUTOSTART = true` it also prints
    `[Client] DEBUG_AUTOSTART: auto-starting FastFood level 1` ~3 s later; with the

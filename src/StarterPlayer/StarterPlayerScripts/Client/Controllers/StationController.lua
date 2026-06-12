@@ -1,6 +1,7 @@
 --!strict
--- Scans Workspace.Stations for Parts with a StationId attribute and wires
--- a ProximityPrompt → Station entity for each one.
+-- Binds a Station entity + ProximityPrompt to every Part tagged "Station"
+-- (carrying a StationId attribute), now and as they stream in/out. Streaming-safe
+-- via CollectionService instead of a one-shot Workspace.Stations snapshot (#13).
 -- Owns the player's held-item state for the session.
 
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -8,9 +9,12 @@ local RunService        = game:GetService("RunService")
 
 local StationEntity   = require(script.Parent.Parent.Entities.Station)
 local ItemStackEntity = require(script.Parent.Parent.Entities.ItemStack)
+local TagBinder       = require(script.Parent.Parent.TagBinder)
 local Signal          = require(ReplicatedStorage.Shared.Packages.Signal)
 local Trove           = require(ReplicatedStorage.Shared.Packages.Trove)
 local Stations        = require(ReplicatedStorage.Shared.Config.Stations)
+
+local STATION_TAG = "Station"
 
 local StationController = {}
 StationController.__index = StationController
@@ -20,9 +24,9 @@ StationController.ItemProduced = Signal.new()  -- fires(stationId, itemId)
 -- The item the local player is currently carrying (one item at a time).
 StationController.heldItem = ItemStackEntity.new()
 
-local _stations: { [string]: any }      = {}
-local _prompts:  { [string]: ProximityPrompt } = {}
-local _trove = Trove.new()
+local _stations: { [string]: any }             = {}  -- stationId → Station entity
+local _prompts:  { [string]: ProximityPrompt } = {}  -- stationId → its prompt
+local _trove = Trove.new()                           -- owns the tag binding
 
 -- Prompt label shown on a station Part.
 local function promptLabel(stationId: string, heldId: string?): string
@@ -37,12 +41,32 @@ local function promptLabel(stationId: string, heldId: string?): string
 	end
 end
 
-local function setupPart(stationId: string, part: BasePart)
+local function refreshAllLabels()
+	for sid, pr in pairs(_prompts) do
+		pr.ActionText = promptLabel(sid, StationController.heldItem.itemId)
+	end
+end
+
+-- Bind one tagged Part. Returns a Trove holding everything created for it so the
+-- binding tears down cleanly when the Part streams out.
+local function bindStation(part: Instance): any?
+	if not part:IsA("BasePart") then return nil end
+	local stationId: string? = part:GetAttribute("StationId")
+	if not stationId then
+		warn("[StationController] Station-tagged part has no StationId attribute: " .. part:GetFullName())
+		return nil
+	end
 	local cfg = Stations[stationId]
 	if not cfg then
 		warn("[StationController] Unknown station id: " .. stationId)
-		return
+		return nil
 	end
+	if _stations[stationId] then
+		-- Same logical station already bound (duplicate tag / re-stream of a twin).
+		return nil
+	end
+
+	local trove = Trove.new()
 
 	-- Start at upgrade level 0; the player's real levels are applied at level start
 	-- (see applyUpgradeLevels), once the profile has loaded.
@@ -51,36 +75,36 @@ local function setupPart(stationId: string, part: BasePart)
 
 	-- Cooker heartbeat tick
 	if cfg.archetype == "Cooker" then
-		_trove:Connect(RunService.Heartbeat, function(dt: number)
+		trove:Connect(RunService.Heartbeat, function(dt: number)
 			station:tick(dt)
 		end)
-		station.ItemReady:Connect(function(itemId: string)
+		trove:Connect(station.ItemReady, function(itemId: string)
 			print(string.format("[%s] Ready: %s", stationId, itemId))
 			StationController.ItemProduced:Fire(stationId, itemId)
 		end)
-		station.ItemBurnt:Connect(function()
+		trove:Connect(station.ItemBurnt, function()
 			warn(string.format("[%s] Item burnt!", stationId))
 		end)
 	end
 
 	-- Dispenser heartbeat tick (refill)
 	if cfg.archetype == "Dispenser" and cfg.refillTime then
-		_trove:Connect(RunService.Heartbeat, function(dt: number)
+		trove:Connect(RunService.Heartbeat, function(dt: number)
 			station:tick(dt)
 		end)
 	end
 
 	-- ProximityPrompt
 	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText  = promptLabel(stationId, nil)
+	prompt.ActionText  = promptLabel(stationId, StationController.heldItem.itemId)
 	prompt.ObjectText  = cfg.displayName
 	prompt.MaxActivationDistance = 8
 	prompt.HoldDuration = 0
 	prompt.Parent = part
 	_prompts[stationId] = prompt
-	_trove:Add(prompt)
+	trove:Add(prompt)
 
-	_trove:Connect(prompt.Triggered, function(_player: Player)
+	trove:Connect(prompt.Triggered, function(_player: Player)
 		local held = StationController.heldItem
 		local result, consumed = station:interact(held.itemId)
 
@@ -95,11 +119,17 @@ local function setupPart(stationId: string, part: BasePart)
 				stationId, held.itemId or "empty"))
 		end
 
-		-- Refresh all prompt labels
-		for sid, pr in pairs(_prompts) do
-			pr.ActionText = promptLabel(sid, StationController.heldItem.itemId)
-		end
+		refreshAllLabels()
 	end)
+
+	return { trove = trove, stationId = stationId }
+end
+
+local function unbindStation(_part: Instance, state: any)
+	if not state then return end
+	_stations[state.stationId] = nil
+	_prompts[state.stationId] = nil
+	state.trove:Destroy()
 end
 
 -- Apply the player's current per-station upgrade levels to the live station
@@ -126,37 +156,22 @@ function StationController:init()
 				s._base  = nil
 				s._added = {}
 			end
-			-- Refresh prompt labels
-			for sid, pr in pairs(_prompts) do
-				pr.ActionText = promptLabel(sid, nil)
-			end
+			refreshAllLabels()
 		elseif newState == "Intro" then
 			-- Level beginning: apply the player's upgrades to live station behaviour.
 			applyUpgradeLevels()
 		end
 	end)
 
-	-- Discover station Parts in the world (placed by the level map or test setup)
-	local stationsFolder = workspace:WaitForChild("Stations", 15) :: Folder?
-	if not stationsFolder then
-		warn("[StationController] Workspace.Stations not found — no stations wired")
-		return
-	end
+	-- Bind stations by tag — streaming-safe, no fixed folder name, and stations
+	-- that stream in/out during play bind and tear down cleanly.
+	_trove:Add(TagBinder.bind(STATION_TAG, bindStation, unbindStation))
 
-	for _, child in ipairs(stationsFolder:GetChildren()) do
-		if child:IsA("BasePart") then
-			local stationId: string? = child:GetAttribute("StationId")
-			if stationId then
-				setupPart(stationId, child)
-			end
-		end
-	end
-
-	print(string.format("[StationController] Wired %d stations", #(function()
+	print(string.format("[StationController] Bound %d stations via '%s' tag", #(function()
 		local t = {} :: {string}
 		for k in pairs(_stations) do table.insert(t, k) end
 		return t
-	end)()))
+	end)(), STATION_TAG))
 end
 
 return StationController

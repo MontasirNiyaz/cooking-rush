@@ -19,7 +19,7 @@ criteria all pass. Exit criteria gate the next phase.
 
 
 ## P1 — Roblox-native core (`tasks/P1.md`)
-- [ ] P1.0 Streaming-safe binding: CollectionService tags, StreamingEnabled=true (ISSUES #13 — prerequisite)
+- [x] P1.0 Streaming-safe binding: CollectionService tags, StreamingEnabled=true (ISSUES #13 — prerequisite)
 - [ ] P1.1 Hub world + RestaurantPlot system
 - [ ] P1.2 Instant-start onboarding (cooking ≤15s from spawn)
 - [ ] P1.3 Interaction + camera model

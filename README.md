@@ -95,9 +95,9 @@ cooking-rush/
    ```
 3. In Roblox Studio, connect via the Rojo plugin, then press **Play**.
 
-When running inside Studio, the client auto-starts FastFood level 1 after a short delay for convenience. The HUD shows coins, combo multiplier, the held item, and the level state. Walk up to a station (or a customer's seat) and press **E**.
+When running inside Studio with `GameConfig.DEBUG_AUTOSTART = true`, the client auto-starts FastFood level 1 after a short delay (off by default — production boots into the menu/idle flow). The HUD shows coins, combo multiplier, the held item, and the level state. Walk up to a station (or a customer's seat) and press **E**.
 
-> **Note:** the in-world kitchen (station Parts under `Workspace.Stations` and seats under `Workspace.Seats`) is built in the place file, not in source. Each station Part carries a `StationId` attribute that the client maps to its config. `Workspace.StreamingEnabled` must be **off** or the controllers won't see the Parts at startup.
+> **Note:** the in-world kitchen (station Parts and seats) is built in the place file, not in source. Run `tools/build_world.lua` in Studio Edit mode to (re)build and tag the world; it is idempotent. Each station Part carries a `StationId` attribute **and** a `Station` CollectionService tag; seats carry a `Seat` tag. The controllers bind by tag via `GetTagged` + added/removed signals (`Client/TagBinder.lua`), so `Workspace.StreamingEnabled` is **on** — Parts that stream in/out bind and tear down cleanly (ISSUES #13 / P1.0).
 
 ---
 
