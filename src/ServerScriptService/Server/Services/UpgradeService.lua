@@ -5,6 +5,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local DataService    = require(script.Parent.DataService)
 local EconomyService = require(script.Parent.EconomyService)
+local HubService     = require(script.Parent.HubService)
 local RemoteGuard    = require(script.Parent.RemoteGuard)
 local Remotes        = require(ReplicatedStorage.Shared.Remotes)
 local Upgrades       = require(ReplicatedStorage.Shared.Config.Upgrades)
@@ -40,6 +41,8 @@ function UpgradeService:purchaseUpgrade(player: Player, stationId: string): { ok
 	end
 
 	profile.upgrades[stationId] = currentLevel + 1
+	-- Republish the player's building tier (this purchase may cross a threshold).
+	HubService:recompute(player)
 	return { ok = true }
 end
 

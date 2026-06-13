@@ -105,6 +105,65 @@ function Schema.validateRestaurants(restaurants: any, stationIds: any, recipeIds
 	return r
 end
 
+-- ── Hub plots ─────────────────────────────────────────────────────────────────
+local function isVec3ish(t: any, keys: { string }): boolean
+	if type(t) ~= "table" then return false end
+	for _, k in ipairs(keys) do
+		if type(t[k]) ~= "number" then return false end
+	end
+	return true
+end
+
+function Schema.validateHubPlots(plots: any, restaurantIds: any): Result
+	local r: Result = { ok = true, errors = {} }
+	if type(plots) ~= "table" then
+		err(r, "HubPlots must be a table")
+		return r
+	end
+	for i, plot in ipairs(plots) do
+		local ctx = "HubPlot[" .. i .. "]"
+		if not restaurantIds[plot.restaurantId] then
+			err(r, ctx .. " unknown restaurantId '" .. tostring(plot.restaurantId) .. "'")
+		end
+		if not isVec3ish(plot.door, { "x", "y", "z", "yaw" }) then
+			err(r, ctx .. ".door needs numeric x,y,z,yaw")
+		end
+		if not isVec3ish(plot.building, { "x", "y", "z", "sizeX", "sizeY", "sizeZ" }) then
+			err(r, ctx .. ".building needs numeric x,y,z,sizeX,sizeY,sizeZ")
+		end
+
+		local tiers = plot.signageTiers
+		local thresholds = plot.tierThresholds
+		if type(tiers) ~= "table" or #tiers == 0 then
+			err(r, ctx .. ".signageTiers must be a non-empty array")
+		end
+		if type(thresholds) ~= "table" or #thresholds == 0 then
+			err(r, ctx .. ".tierThresholds must be a non-empty array")
+		elseif thresholds[1] ~= 0 then
+			err(r, ctx .. ".tierThresholds[1] must be 0 (every player is ≥ tier 1)")
+		else
+			for t = 2, #thresholds do
+				if thresholds[t] <= thresholds[t - 1] then
+					err(r, ctx .. ".tierThresholds must be strictly ascending")
+					break
+				end
+			end
+		end
+		if type(tiers) == "table" and type(thresholds) == "table" and #tiers ~= #thresholds then
+			err(r, ctx .. " signageTiers and tierThresholds must have equal length (one colour per tier)")
+		end
+		if type(tiers) == "table" then
+			for t, colour in ipairs(tiers) do
+				if not (type(colour) == "table" and #colour == 3
+					and type(colour[1]) == "number" and type(colour[2]) == "number" and type(colour[3]) == "number") then
+					err(r, ctx .. ".signageTiers[" .. t .. "] must be {r,g,b}")
+				end
+			end
+		end
+	end
+	return r
+end
+
 -- ── Master validator ──────────────────────────────────────────────────────────
 function Schema.validateAll()
 	local Shared = game:GetService("ReplicatedStorage").Shared
@@ -113,6 +172,7 @@ function Schema.validateAll()
 	local Recipes      = require(Shared.Config.Recipes)
 	local Restaurants  = require(Shared.Config.Restaurants)
 	local Customers    = require(Shared.Config.Customers)
+	local HubPlots     = require(Shared.Config.HubPlots)
 
 	local allErrors: { string } = {}
 
@@ -124,6 +184,7 @@ function Schema.validateAll()
 	collect(Schema.validateStations(Stations))
 	collect(Schema.validateRecipes(Recipes, Ingredients))
 	collect(Schema.validateRestaurants(Restaurants, Stations, Recipes))
+	collect(Schema.validateHubPlots(HubPlots, Restaurants))
 
 	-- Customers: minimal check
 	for id, c in pairs(Customers) do

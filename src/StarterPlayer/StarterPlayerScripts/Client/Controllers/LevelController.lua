@@ -26,6 +26,7 @@ export type LevelController = typeof({} :: {
 	startLevel:  (self: any, restaurantId: string, levelIndex: number) -> (),
 	addCoins:    (self: any, amount: number) -> (),
 	endLevel:    (self: any) -> (),
+	returnToIdle: (self: any) -> (),
 })
 
 local LevelController = {}
@@ -101,6 +102,14 @@ function LevelController:endLevel()
 			})
 		end)
 	end
+end
+
+-- Dismiss the results screen and return to the hub (Idle). Only valid from
+-- Results; the hub is the same world, so this is purely a state reset.
+function LevelController:returnToIdle()
+	if self.state ~= Enums.LevelState.Results then return end
+	self.currentLevel = nil
+	self:_setState(Enums.LevelState.Idle)
 end
 
 function LevelController:init()

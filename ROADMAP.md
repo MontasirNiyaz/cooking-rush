@@ -20,7 +20,7 @@ criteria all pass. Exit criteria gate the next phase.
 
 ## P1 — Roblox-native core (`tasks/P1.md`)
 - [x] P1.0 Streaming-safe binding: CollectionService tags, StreamingEnabled=true (ISSUES #13 — prerequisite)
-- [ ] P1.1 Hub world + RestaurantPlot system
+- [x] P1.1 Hub world + RestaurantPlot system  *(code complete; core live-verified — doors/tint/HubTier/schema/no-errors; tier-flip is unit-tested, full live re-verify pending next Studio session)*
 - [ ] P1.2 Instant-start onboarding (cooking ≤15s from spawn)
 - [ ] P1.3 Interaction + camera model
 - [ ] P1.4 Game-feel pass (JuiceService + Effects.lua)
@@ -68,6 +68,12 @@ criteria all pass. Exit criteria gate the next phase.
 - DECIDED: prestige scope = per-restaurant.
 - DECIDED: Dispenser stays single-output; multi-item machines = one dispenser per item (ISSUES #16).
 - DECIDED: shipped GameConfig values are balance truth; content doc is reference (ISSUES #17).
+- DECIDED (P1.1): hub buildings render the LOCAL player's tier on their own client
+  (HubController tints signage from the local profile via HubMath). Other players'
+  tiers surface as a nameplate badge fed by server-published `HubTier_<id>` Player
+  attributes (HubService). Rationale: per-viewer building rendering is cheap because
+  the visual is local-only — no per-player building clones, no server geometry churn;
+  the server stays authoritative for the *value*, the client just paints it.
 - OPEN: station interaction = ProximityPrompt vs direct click (P1.3 playtest decides).
 
 ## Traceability — M7–M12 designs & ISSUES #8–17 → phase tasks

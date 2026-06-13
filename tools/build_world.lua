@@ -17,9 +17,16 @@
 -- Adding a restaurant's world = add a STATIONS entry. No engine code, no new tool.
 
 local CollectionService = game:GetService("CollectionService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+-- Hub plot layout is config truth (Shared/Config/HubPlots), so the plaza geometry
+-- and the runtime never disagree.
+local HubPlots = require(ReplicatedStorage.Shared.Config.HubPlots)
 
 local STATION_TAG = "Station"
 local SEAT_TAG    = "Seat"
+local DOOR_TAG    = "RestaurantDoor"
+local SIGNAGE_TAG = "RestaurantSignage"
 
 -- Colour by station role (project convention).
 local COLOUR = {
@@ -141,9 +148,83 @@ local function buildWorld()
 		if ensureTag(part, SEAT_TAG) then taggedSeats += 1 end
 	end
 
+	-- ── Hub plaza (P1.1): floor, per-restaurant building+signage, doors, spawn ──
+	local hubFolder = ensureFolder("Hub")
+	local existingHub = {}
+	for _, p in ipairs(hubFolder:GetChildren()) do existingHub[p.Name] = p end
+
+	local function ensureHubPart(name: string): (BasePart, boolean)
+		local p = existingHub[name]
+		local created = false
+		if not p then
+			p = Instance.new("Part")
+			p.Name = name
+			p.Anchored = true
+			p.Parent = hubFolder
+			existingHub[name] = p
+			created = true
+		end
+		return p, created
+	end
+
+	-- Plaza floor spanning both kitchens.
+	local floor = ensureHubPart("PlazaFloor")
+	floor.Size = Vector3.new(120, 1, 60)
+	floor.Position = Vector3.new(14, -0.5, 0)
+	floor.Color = Color3.fromRGB(60, 65, 72)
+
+	-- Shared spawn in the plaza, facing the buildings.
+	local spawn = existingHub["HubSpawn"]
+	if not spawn then
+		spawn = Instance.new("SpawnLocation")
+		spawn.Name = "HubSpawn"
+		spawn.Anchored = true
+		spawn.Parent = hubFolder
+		existingHub["HubSpawn"] = spawn
+	end
+	spawn.Size = Vector3.new(8, 1, 8)
+	spawn.Position = Vector3.new(14, 0.5, 22)
+	spawn.Color = Color3.fromRGB(90, 200, 120)
+	spawn.Neutral = true
+
+	-- Make HubSpawn the sole active spawn: any other SpawnLocation left over from
+	-- the original place (e.g. one next to the kitchen) would compete round-robin
+	-- and drop players outside the plaza. Disable them so players spawn in the hub.
+	local disabledSpawns = 0
+	for _, d in ipairs(workspace:GetDescendants()) do
+		if d:IsA("SpawnLocation") and d ~= spawn and d.Enabled then
+			d.Enabled = false
+			disabledSpawns += 1
+		end
+	end
+
+	local createdHub, taggedHub = 0, 0
+	for _, plot in ipairs(HubPlots) do
+		local rid = plot.restaurantId
+		-- Building facade doubles as the signage Part (tinted per tier at runtime).
+		local sign, sCreated = ensureHubPart("Building_" .. rid)
+		local b = plot.building
+		sign.Size = Vector3.new(b.sizeX, b.sizeY, b.sizeZ)
+		sign.Position = Vector3.new(b.x, b.y, b.z)
+		sign.Color = Color3.fromRGB(120, 120, 120)
+		sign:SetAttribute("RestaurantId", rid)
+		if sCreated then createdHub += 1 end
+		if ensureTag(sign, SIGNAGE_TAG) then taggedHub += 1 end
+
+		-- Door: plaza-side interaction anchor.
+		local door, dCreated = ensureHubPart("Door_" .. rid)
+		local d = plot.door
+		door.Size = Vector3.new(6, 8, 1)
+		door.CFrame = CFrame.new(d.x, d.y, d.z) * CFrame.Angles(0, math.rad(d.yaw), 0)
+		door.Color = Color3.fromRGB(150, 110, 60)
+		door:SetAttribute("RestaurantId", rid)
+		if dCreated then createdHub += 1 end
+		if ensureTag(door, DOOR_TAG) then taggedHub += 1 end
+	end
+
 	return string.format(
-		"[build_world] StreamingEnabled=true | stations: +%d new, +%d tagged | seats: +%d new, +%d tagged",
-		createdStations, taggedStations, createdSeats, taggedSeats)
+		"[build_world] StreamingEnabled=true | stations: +%d new, +%d tagged | seats: +%d new, +%d tagged | hub: +%d new, +%d tagged | other spawns disabled: %d",
+		createdStations, taggedStations, createdSeats, taggedSeats, createdHub, taggedHub, disabledSpawns)
 end
 
 return buildWorld()
