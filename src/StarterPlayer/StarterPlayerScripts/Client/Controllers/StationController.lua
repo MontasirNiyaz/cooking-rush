@@ -10,6 +10,7 @@ local RunService        = game:GetService("RunService")
 local StationEntity   = require(script.Parent.Parent.Entities.Station)
 local ItemStackEntity = require(script.Parent.Parent.Entities.ItemStack)
 local TagBinder       = require(script.Parent.Parent.TagBinder)
+local Interactable    = require(script.Parent.Parent.Interactable)
 local Signal          = require(ReplicatedStorage.Shared.Packages.Signal)
 local Trove           = require(ReplicatedStorage.Shared.Packages.Trove)
 local Stations        = require(ReplicatedStorage.Shared.Config.Stations)
@@ -24,9 +25,9 @@ StationController.ItemProduced = Signal.new()  -- fires(stationId, itemId)
 -- The item the local player is currently carrying (one item at a time).
 StationController.heldItem = ItemStackEntity.new()
 
-local _stations: { [string]: any }             = {}  -- stationId → Station entity
-local _prompts:  { [string]: ProximityPrompt } = {}  -- stationId → its prompt
-local _trove = Trove.new()                           -- owns the tag binding
+local _stations: { [string]: any } = {}  -- stationId → Station entity
+local _handles:  { [string]: any } = {}  -- stationId → Interactable handle
+local _trove = Trove.new()               -- owns the tag binding
 
 -- Prompt label shown on a station Part.
 local function promptLabel(stationId: string, heldId: string?): string
@@ -42,8 +43,8 @@ local function promptLabel(stationId: string, heldId: string?): string
 end
 
 local function refreshAllLabels()
-	for sid, pr in pairs(_prompts) do
-		pr.ActionText = promptLabel(sid, StationController.heldItem.itemId)
+	for sid, handle in pairs(_handles) do
+		handle:setActionText(promptLabel(sid, StationController.heldItem.itemId))
 	end
 end
 
@@ -94,17 +95,8 @@ local function bindStation(part: Instance): any?
 		end)
 	end
 
-	-- ProximityPrompt
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText  = promptLabel(stationId, StationController.heldItem.itemId)
-	prompt.ObjectText  = cfg.displayName
-	prompt.MaxActivationDistance = 8
-	prompt.HoldDuration = 0
-	prompt.Parent = part
-	_prompts[stationId] = prompt
-	trove:Add(prompt)
-
-	trove:Connect(prompt.Triggered, function(_player: Player)
+	-- Interaction (ProximityPrompt or tap, per GameConfig.INTERACTION_MODE).
+	local function onActivate(_player: Player)
 		local held = StationController.heldItem
 		local result, consumed = station:interact(held.itemId)
 
@@ -120,7 +112,16 @@ local function bindStation(part: Instance): any?
 		end
 
 		refreshAllLabels()
-	end)
+	end
+
+	local handle = Interactable.bind(part, {
+		objectText  = cfg.displayName,
+		actionText  = promptLabel(stationId, StationController.heldItem.itemId),
+		maxDistance = 8,
+		onActivate  = onActivate,
+	})
+	_handles[stationId] = handle
+	trove:Add(handle)
 
 	return { trove = trove, stationId = stationId }
 end
@@ -128,7 +129,7 @@ end
 local function unbindStation(_part: Instance, state: any)
 	if not state then return end
 	_stations[state.stationId] = nil
-	_prompts[state.stationId] = nil
+	_handles[state.stationId] = nil
 	state.trove:Destroy()
 end
 

@@ -18,6 +18,28 @@ Build a Roblox cooking game ("Cooking Rush") using a data-driven architecture wh
 | M5 — ProgressionService, UpgradeService, Shop UI | **Complete** |
 | M6 — Sushi restaurant (config-only) | **Complete** |
 
+### P1 — Roblox-native core (in progress; see ROADMAP.md / tasks/P1.md)
+
+| Phase | Status |
+|-------|--------|
+| P1.0 — Streaming-safe tag binding | **Done** (live-verified) |
+| P1.1 — Hub world + RestaurantPlot | Code complete; **live re-verify pending** |
+| P1.2 — Instant-start onboarding | Code complete; **live verify pending** |
+| P1.3 — Interaction + camera model | Code complete; **live verify pending** |
+| P1.4 — Game-feel pass | Not started |
+| P1.5 — Mobile perf budget | Not started |
+
+> **Verification owed (next Studio session):** P1.1–P1.3 were built while the Studio
+> MCP bridge was disconnected, so they passed `rojo build` (parse) + unit specs but
+> were not driven live. To verify: run `tools/build_world.lua` (Edit mode) to
+> (re)build the plaza, then Play and check — spawn in the plaza; door → level board →
+> level → "Return to Hub"; a fresh profile (seenTutorial=false) drops you at the
+> kitchen cook-spot with the tutorial hints; buying 3 upgrades flips the building
+> tier 1→2; the kitchen camera locks during a level and frees in the hub; flip
+> `GameConfig.INTERACTION_MODE` to "tap" and confirm every station + serving works.
+> Then run the suite (`require(game.ServerStorage.Tests.TestRunner).runAll()`),
+> expecting the HubMath + TutorialSteps specs green alongside the existing ones.
+
 ---
 
 ## Architecture Overview

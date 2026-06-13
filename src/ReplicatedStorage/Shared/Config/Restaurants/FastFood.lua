@@ -14,6 +14,15 @@ return {
 	dailyIncome    = 50,
 	levelCount     = 40,
 
+	-- Fixed in-level kitchen camera (P1.3): camera sits at focus+offset looking at
+	-- focus. Isometric-ish so the counter + seats are readable on a phone. Free
+	-- camera returns in the hub.
+	camera = {
+		focus  = { x = -10, y = 3, z = -3 },
+		offset = { x = 0,   y = 18, z = 24 },
+		fov    = 45,
+	},
+
 	-- Authored deviations from the generated curve (sparse overrides).
 	levelOverrides = {
 		[1] = { tutorial = true, customerCount = 4, menuPool = { "cola", "fries" } },

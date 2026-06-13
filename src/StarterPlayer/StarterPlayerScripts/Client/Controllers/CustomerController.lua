@@ -9,6 +9,7 @@ local RunService        = game:GetService("RunService")
 
 local CustomerEntity = require(script.Parent.Parent.Entities.Customer)
 local TagBinder      = require(script.Parent.Parent.TagBinder)
+local Interactable   = require(script.Parent.Parent.Interactable)
 local Enums          = require(ReplicatedStorage.Shared.Modules.Enums)
 local Customers      = require(ReplicatedStorage.Shared.Config.Customers)
 local Signal         = require(ReplicatedStorage.Shared.Packages.Signal)
@@ -29,7 +30,7 @@ local _trove                     = Trove.new()
 -- Seat state keyed by the seat Part so seats can stream in/out individually.
 type SeatState = {
 	free: boolean,
-	prompt: ProximityPrompt?,
+	handle: any,          -- Interactable handle for serving (or nil)
 	bar: BillboardGui?,
 	fill: Frame?,
 }
@@ -89,7 +90,7 @@ end
 local function clearSeatVisuals(seat: BasePart)
 	local st = _seatState[seat]
 	if not st then return end
-	if st.prompt then st.prompt:Destroy(); st.prompt = nil end
+	if st.handle then st.handle:Destroy(); st.handle = nil end
 	if st.bar then st.bar:Destroy(); st.bar = nil; st.fill = nil end
 	st.free = true
 	seat.BrickColor = NEUTRAL
@@ -109,43 +110,42 @@ local function attachToSeat(customer: any, seat: BasePart)
 	st.free = false
 	seat.BrickColor = TAKEN
 
-	-- ProximityPrompt for serving
-	local prompt = Instance.new("ProximityPrompt")
-	prompt.ActionText  = buildOrderText(customer)
-	prompt.ObjectText  = "Customer"
-	prompt.MaxActivationDistance = 8
-	prompt.HoldDuration = 0
-	prompt.Parent = seat
-	st.prompt = prompt
-
 	-- Patience bar above the seat
 	local bb, fill = makePatienceBar(seat)
 	st.bar  = bb
 	st.fill = fill
 
-	prompt.Triggered:Connect(function(_player: Player)
-		if customer.state ~= Enums.CustomerState.Waiting then return end
-		local StationController = require(script.Parent.StationController)
-		local OrderController   = require(script.Parent.OrderController)
+	-- Serving interaction (ProximityPrompt or tap, per GameConfig.INTERACTION_MODE).
+	local handle
+	handle = Interactable.bind(seat, {
+		objectText  = "Customer",
+		actionText  = buildOrderText(customer),
+		maxDistance = 8,
+		onActivate  = function(_player: Player)
+			if customer.state ~= Enums.CustomerState.Waiting then return end
+			local StationController = require(script.Parent.StationController)
+			local OrderController   = require(script.Parent.OrderController)
 
-		local heldId = StationController.heldItem.itemId
-		if not heldId then
-			print("[CustomerController] Nothing in hand to serve")
-			return
-		end
-
-		local ok = OrderController:tryServe(customer, heldId)
-		if ok then
-			StationController.heldItem.itemId = nil
-			prompt.ActionText = buildOrderText(customer)
-
-			if #customer.pendingOrders == 0 then
-				customer:serve()
+			local heldId = StationController.heldItem.itemId
+			if not heldId then
+				print("[CustomerController] Nothing in hand to serve")
+				return
 			end
-		else
-			print("[CustomerController] Wrong item: " .. heldId)
-		end
-	end)
+
+			local ok = OrderController:tryServe(customer, heldId)
+			if ok then
+				StationController.heldItem.itemId = nil
+				handle:setActionText(buildOrderText(customer))
+
+				if #customer.pendingOrders == 0 then
+					customer:serve()
+				end
+			else
+				print("[CustomerController] Wrong item: " .. heldId)
+			end
+		end,
+	})
+	st.handle = handle
 end
 
 -- Bind one tagged seat Part.

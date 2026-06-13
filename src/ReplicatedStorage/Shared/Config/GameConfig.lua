@@ -83,4 +83,12 @@ return {
 		levelIndex   = 1,
 		cookSpot     = { x = -10, y = 5, z = 2, yaw = 180 },
 	},
+
+	-- Interaction model (P1.3). Both ProximityPrompt and direct tap/click are
+	-- implemented behind this flag; a playtest picks one and the loser is deleted.
+	-- "prompt" = ProximityPrompt; "tap" = ClickDetector on an oversized invisible
+	-- hitbox (phone-friendly touch target). One input path for every interactable.
+	INTERACTION_MODE   = "prompt",  -- "prompt" | "tap"
+	TAP_HITBOX_PADDING = 1.5,       -- studs added each side of the part in tap mode
+	TAP_HITBOX_MIN     = 6,         -- minimum hitbox edge (studs) for a fat touch target
 }

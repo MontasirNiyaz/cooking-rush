@@ -15,6 +15,11 @@ export type RestaurantConfig = {
 	dailyIncome: number,
 	levelCount: number,
 	levelOverrides: { [number]: { [string]: any } },
+	camera: {
+		focus: { x: number, y: number, z: number },
+		offset: { x: number, y: number, z: number },
+		fov: number,
+	},
 }
 
 local Restaurants: { [string]: RestaurantConfig } = {

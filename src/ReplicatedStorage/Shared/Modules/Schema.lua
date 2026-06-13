@@ -101,6 +101,20 @@ function Schema.validateRestaurants(restaurants: any, stationIds: any, recipeIds
 		for _, rid in ipairs(rest.menu) do
 			if not recipeIds[rid] then err(r, ctx .. " unknown menu recipe '" .. rid .. "'") end
 		end
+
+		-- In-level camera (P1.3): focus + offset vectors and a numeric fov.
+		local cam = rest.camera
+		if type(cam) ~= "table" then
+			err(r, ctx .. ".camera must be a table")
+		else
+			for _, key in ipairs({ "focus", "offset" }) do
+				local v = cam[key]
+				if type(v) ~= "table" or type(v.x) ~= "number" or type(v.y) ~= "number" or type(v.z) ~= "number" then
+					err(r, ctx .. ".camera." .. key .. " needs numeric x,y,z")
+				end
+			end
+			if type(cam.fov) ~= "number" then err(r, ctx .. ".camera.fov must be a number") end
+		end
 	end
 	return r
 end

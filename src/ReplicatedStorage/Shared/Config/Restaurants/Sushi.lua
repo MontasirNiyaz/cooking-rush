@@ -13,6 +13,14 @@ return {
 	dailyIncome    = 80,
 	levelCount     = 40,
 
+	-- Fixed in-level kitchen camera (P1.3); same framing, shifted to the Sushi
+	-- kitchen (X ~34).
+	camera = {
+		focus  = { x = 34, y = 3, z = -3 },
+		offset = { x = 0,  y = 18, z = 24 },
+		fov    = 45,
+	},
+
 	levelOverrides = {
 		[1]  = { tutorial = true, customerCount = 4, menuPool = { "green_tea", "salmon_nigiri" } },
 		[10] = { customerCount = 8 },

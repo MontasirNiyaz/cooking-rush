@@ -55,8 +55,13 @@ local function buildGui()
 		UDim2.new(1, -180, 0, 8), UDim2.new(0.17, 0, 0, 36),
 		Enum.TextXAlignment.Right)
 
+	-- Held item: large bottom-centre pill in the one-hand thumb zone (portrait-first).
 	_heldLabel = makeLabel(gui, "HeldItem", "Holding: nothing",
-		UDim2.new(0.35, 0, 1, -52), UDim2.new(0.3, 0, 0, 44))
+		UDim2.new(0.5, 0, 1, -64), UDim2.new(0.6, 0, 0, 52))
+	_heldLabel.AnchorPoint = Vector2.new(0.5, 1)
+	local heldCorner = Instance.new("UICorner")
+	heldCorner.CornerRadius = UDim.new(0, 12)
+	heldCorner.Parent = _heldLabel
 
 	buildResults(gui)
 end

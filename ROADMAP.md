@@ -22,7 +22,7 @@ criteria all pass. Exit criteria gate the next phase.
 - [x] P1.0 Streaming-safe binding: CollectionService tags, StreamingEnabled=true (ISSUES #13 — prerequisite)
 - [x] P1.1 Hub world + RestaurantPlot system  *(code complete; core live-verified — doors/tint/HubTier/schema/no-errors; tier-flip is unit-tested, full live re-verify pending next Studio session)*
 - [x] P1.2 Instant-start onboarding (cooking ≤15s from spawn)  *(code complete; live verify pending next Studio session)*
-- [ ] P1.3 Interaction + camera model
+- [x] P1.3 Interaction + camera model  *(code complete; live verify pending next Studio session)*
 - [ ] P1.4 Game-feel pass (JuiceService + Effects.lua)
 - [ ] P1.5 Mobile performance budget enforced
 - **Exit:** new player on phone is cooking within 15s, in a hub showing other players'
@@ -74,7 +74,12 @@ criteria all pass. Exit criteria gate the next phase.
   attributes (HubService). Rationale: per-viewer building rendering is cheap because
   the visual is local-only — no per-player building clones, no server geometry churn;
   the server stays authoritative for the *value*, the client just paints it.
-- OPEN: station interaction = ProximityPrompt vs direct click (P1.3 playtest decides).
+- OPEN: station interaction = ProximityPrompt vs direct tap/click. BOTH are
+  implemented behind `GameConfig.INTERACTION_MODE` ("prompt" default | "tap") via
+  one generic `Client/Interactable.lua` (no per-station input code). A phone
+  playtest picks the winner; delete the loser branch + the flag then. Tap mode
+  uses an oversized invisible hitbox (`TAP_HITBOX_PADDING`/`_MIN`) for fat touch
+  targets.
 
 ## Traceability — M7–M12 designs & ISSUES #8–17 → phase tasks
 
