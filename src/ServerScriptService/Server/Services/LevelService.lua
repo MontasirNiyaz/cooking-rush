@@ -137,6 +137,9 @@ function LevelService:init()
 		if reward.gems  > 0 then EconomyService:addGems(player, reward.gems) end
 		ProgressionService:addXP(player, reward.xp)
 		ProgressionService:recordStars(player, restaurantId, levelIndex, stars)
+		-- First completed level clears the onboarding flag (server-authoritative;
+		-- the client reads profile.seenTutorial at boot to decide whether to run it).
+		profile.seenTutorial = true
 		DataService:save(player)
 
 		return { ok = true, reward = reward, newStars = stars }

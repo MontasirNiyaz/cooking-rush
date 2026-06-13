@@ -73,4 +73,14 @@ return {
 	-- Daily reward
 	DAILY_COIN_BASE         = 50,
 	DAILY_INTERVAL_SECONDS  = 86400,
+
+	-- Onboarding (P1.2): a first-session player (profile.seenTutorial == false) is
+	-- placed at this kitchen cook-spot with the level below auto-starting, so they
+	-- are cooking within seconds instead of crossing the plaza. cookSpot is a world
+	-- anchor inside the FastFood kitchen (x,y,z + yaw degrees facing the counter).
+	ONBOARDING = {
+		restaurantId = "fastfood",
+		levelIndex   = 1,
+		cookSpot     = { x = -10, y = 5, z = 2, yaw = 180 },
+	},
 }

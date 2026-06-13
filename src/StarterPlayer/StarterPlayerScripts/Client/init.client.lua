@@ -18,6 +18,7 @@ local UIController       = require(Controllers.UIController)
 local ProfileController  = require(Controllers.ProfileController)
 local ShopController     = require(Controllers.ShopController)
 local HubController      = require(Controllers.HubController)
+local TutorialController = require(Controllers.TutorialController)
 
 ComboController:init()
 OrderController:init()
@@ -28,6 +29,7 @@ UIController:init()
 ProfileController:init()
 ShopController:init()
 HubController:init()
+TutorialController:init()
 
 print("[Client] Cooking Rush client ready.")
 

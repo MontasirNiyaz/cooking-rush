@@ -164,6 +164,58 @@ function Schema.validateHubPlots(plots: any, restaurantIds: any): Result
 	return r
 end
 
+-- ── Tutorial steps ────────────────────────────────────────────────────────────
+local VALID_TRIGGERS  = { levelStart = true, afterStep = true }
+local VALID_HILITES   = { station = true, occupiedSeat = true, none = true }
+local VALID_COMPLETE  = { hold = true, produce = true, serve = true, interactAny = true, timer = true }
+
+function Schema.validateTutorialSteps(steps: any, stationIds: any, ingredientIds: any): Result
+	local r: Result = { ok = true, errors = {} }
+	if type(steps) ~= "table" then
+		err(r, "TutorialSteps must be a table")
+		return r
+	end
+	local seen: { [string]: boolean } = {}
+	for i, step in ipairs(steps) do
+		local ctx = "TutorialStep[" .. i .. "]"
+		if type(step.id) ~= "string" then
+			err(r, ctx .. ".id must be string")
+		else
+			ctx = "TutorialStep[" .. step.id .. "]"
+			if seen[step.id] then err(r, ctx .. " duplicate id") end
+			seen[step.id] = true
+		end
+		if type(step.promptText) ~= "string" then err(r, ctx .. ".promptText must be string") end
+
+		local trig = step.trigger
+		if type(trig) ~= "table" or not VALID_TRIGGERS[trig.kind] then
+			err(r, ctx .. ".trigger.kind invalid")
+		elseif trig.kind == "afterStep" and not seen[trig.step] then
+			-- afterStep must reference a step defined earlier (seen so far).
+			err(r, ctx .. ".trigger references unknown/forward step '" .. tostring(trig.step) .. "'")
+		end
+
+		local hi = step.highlight
+		if type(hi) ~= "table" or not VALID_HILITES[hi.kind] then
+			err(r, ctx .. ".highlight.kind invalid")
+		elseif hi.kind == "station" and not stationIds[hi.id] then
+			err(r, ctx .. ".highlight unknown station '" .. tostring(hi.id) .. "'")
+		end
+
+		local co = step.completeOn
+		if type(co) ~= "table" or not VALID_COMPLETE[co.kind] then
+			err(r, ctx .. ".completeOn.kind invalid")
+		elseif co.kind == "hold" and not ingredientIds[co.item] then
+			err(r, ctx .. ".completeOn unknown item '" .. tostring(co.item) .. "'")
+		elseif co.kind == "produce" and not stationIds[co.station] then
+			err(r, ctx .. ".completeOn unknown station '" .. tostring(co.station) .. "'")
+		elseif co.kind == "timer" and type(co.seconds) ~= "number" then
+			err(r, ctx .. ".completeOn.timer needs numeric seconds")
+		end
+	end
+	return r
+end
+
 -- ── Master validator ──────────────────────────────────────────────────────────
 function Schema.validateAll()
 	local Shared = game:GetService("ReplicatedStorage").Shared
@@ -173,6 +225,7 @@ function Schema.validateAll()
 	local Restaurants  = require(Shared.Config.Restaurants)
 	local Customers    = require(Shared.Config.Customers)
 	local HubPlots     = require(Shared.Config.HubPlots)
+	local TutorialSteps = require(Shared.Config.TutorialSteps)
 
 	local allErrors: { string } = {}
 
@@ -185,6 +238,7 @@ function Schema.validateAll()
 	collect(Schema.validateRecipes(Recipes, Ingredients))
 	collect(Schema.validateRestaurants(Restaurants, Stations, Recipes))
 	collect(Schema.validateHubPlots(HubPlots, Restaurants))
+	collect(Schema.validateTutorialSteps(TutorialSteps, Stations, Ingredients))
 
 	-- Customers: minimal check
 	for id, c in pairs(Customers) do

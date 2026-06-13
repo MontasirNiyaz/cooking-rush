@@ -25,6 +25,7 @@ export type Profile = {
 	upgrades: { [string]: number },
 	lastDailyClaim: number,
 	lastIncomeClaim: { [string]: number },
+	seenTutorial: boolean,  -- false until the first onboarding level is completed
 	version: number,
 	sessionLock: SessionLock.Lock?,  -- server-only; set inside load/save transforms
 }
@@ -36,6 +37,7 @@ local DEFAULT_PROFILE: Profile = {
 	unlockedRestaurants = { fastfood = true },
 	levelStars = {}, upgrades = {},
 	lastDailyClaim = 0, lastIncomeClaim = {},
+	seenTutorial = false,
 	version = CURRENT_VERSION,
 }
 

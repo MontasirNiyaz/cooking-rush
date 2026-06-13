@@ -21,7 +21,7 @@ criteria all pass. Exit criteria gate the next phase.
 ## P1 — Roblox-native core (`tasks/P1.md`)
 - [x] P1.0 Streaming-safe binding: CollectionService tags, StreamingEnabled=true (ISSUES #13 — prerequisite)
 - [x] P1.1 Hub world + RestaurantPlot system  *(code complete; core live-verified — doors/tint/HubTier/schema/no-errors; tier-flip is unit-tested, full live re-verify pending next Studio session)*
-- [ ] P1.2 Instant-start onboarding (cooking ≤15s from spawn)
+- [x] P1.2 Instant-start onboarding (cooking ≤15s from spawn)  *(code complete; live verify pending next Studio session)*
 - [ ] P1.3 Interaction + camera model
 - [ ] P1.4 Game-feel pass (JuiceService + Effects.lua)
 - [ ] P1.5 Mobile performance budget enforced
